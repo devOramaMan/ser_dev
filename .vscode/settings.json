@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "stdio.h": "c",
+        "time.h": "c",
+        "windef.h": "c",
+        "windows.h": "c",
+        "stdlib.h": "c",
+        "ftdi_connect.h": "c",
+        "ftdi_config.h": "c",
+        "stdbool.h": "c",
+        "stdint.h": "c",
+        "ftd2xx.h": "c",
+        "stdint-gcc.h": "c",
+        "ftdi_atomic.h": "c",
+        "locale": "c",
+        "string": "c"
+    }
+}

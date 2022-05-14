@@ -1,0 +1,68 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/${fileBasenameNoExtension}.exe",
+            "args": [
+                "-c",
+				"FT4YBP6U",
+                "-t"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [
+                {"name":"PYTHONHOME", "value": "/usr/"},
+                {"name":"PYTHONPATH", "value": "/usr/lib/python2.7"}
+            ],
+            "externalConsole": true,
+            "miDebuggerPath": "C:\\cygwin64\\bin\\gdb.exe",
+            "linux": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            },
+            "osx": {
+                "MIMode": "lldb"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            }
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "preLaunchTask": "gen_ui",
+            "request": "launch",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "logToFile": true,
+            "program": "${file}",
+            "qt": "auto",
+            "console": "integratedTerminal",
+            "python": "${command:python.interpreterPath}",
+            "args": ["--d", "10"],//["--Port", "COM5", "-b", "-d", "10"],//["--Port", "COM5", "--all"],//"--avg", "1"],//["--Port", "COM5", "-r", "50", "-f", "0"], //["--d", "10", "-f", "0", "-r", "1000", ],,//
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot};${workspaceRoot}/common/graph;${workspaceRoot}/common/modbus;${workspaceRoot}/common/modbus"
+            }
+        }
+    ]
+}
