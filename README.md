@@ -1,9 +1,18 @@
-# ser_ftdi
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
 
-
-1. run autoconfig:
-> ./autogen.sh
-2 run configure (generates makefiles etc)
-> ./configure
-3 build program
-> make
+<h1>Build project:</h1>
+  
+  <ol>
+  <li>run autoconfig:</li>
+    <p>./autogen.sh</p>
+  <li>run configure (generates makefiles etc):</li>
+    <p>./configure</p>
+  <li>Build:</li>
+     <p>make</p>
+</ol> 
+  
+</html>
