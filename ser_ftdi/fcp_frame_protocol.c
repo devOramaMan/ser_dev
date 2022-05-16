@@ -1,8 +1,19 @@
 
 
 #include "fcp_frame_protocol.h"
+#include "util_common.h"
 #include <stddef.h>
 
+/* Defines ----------------------------------------------------------------*/
+
+/** @brief Index of FCP frame payload length */
+#define PAYLOADLEN_IDX    1
+/** @brief Index of FCP frame error code */
+#define ERRCODE_IDX       2
+/** @brief Index of FCP frame payload */
+#define PAYLOAD_IDX       2
+/** @brief Offset of the CRC from payload length*/
+#define CRC_OFFSET        2
 
 /** @brief Size of the Header of an FCP frame */
 #define FCP_HEADER_SIZE       2
@@ -12,20 +23,13 @@
 #define FCP_CRC_SIZE          1
 /** @brief Maximum size of an FCP frame, all inclusive */
 #define FCP_MAX_FRAME_SIZE    (FCP_HEADER_SIZE + FCP_MAX_PAYLOAD_SIZE + FCP_CRC_SIZE)
-
-#define KMC_TX_FRAME_SIZE 3
-
-#define FCP_CODE_ACK  0xf0
-#define FCP_CODE_NACK 0xff
-
-#define FCP_STATUS_TRANSFER_ONGOING  0x01
-#define FCP_STATUS_WAITING_TRANSFER  0x02
-#define FCP_STATUS_INVALID_PARAMETER 0x03
-#define FCP_STATUS_TIME_OUT          0x04
-#define FCP_STATUS_INVALID_FRAME     0x05
+/** @brief FCP Acknowlage code (success msg) */
+#define FCP_CODE_ACK  0xF0
+/** @brief FCP Acknowlage Failed code (unsuccess msg) */
+#define FCP_CODE_NACK 0xFF
 
 
-uint8_t * fsp_frame_parse(uint8_t *Buffer, uint32_t * size);
+int32_t fsp_frame_parse(uint8_t *Buffer, uint32_t * size);
 
 
 /**
@@ -63,31 +67,66 @@ uint8_t FCP_CalcCRC( FCP_Frame_t * pFrame )
   return nCRC;
 }
 
-
-uint8_t * fsp_frame_parse(uint8_t *Buffer, uint32_t * size)
+inline int32_t fsp_frame_parse(uint8_t *Buffer, uint32_t *size)
 {
+  uint8_t crc;
+  uint32_t lsize = *size;
+  FCP_Frame_t * pFrame = (FCP_Frame_t*) Buffer;
 
+  if (lsize < PAYLOAD_IDX)
+  {
+    return LISTENER_STATUS_UNDERFLOW;
+  }
+  else
+  {
+
+    if ((pFrame->Code != FCP_CODE_ACK) && (pFrame->Code != FCP_CODE_NACK))
+      return LISTENER_STATUS_INVALID_CODE;
+
+
+    if (lsize < pFrame->Size + CRC_OFFSET)
+      return LISTENER_STATUS_UNDERFLOW;
+
+    crc = pFrame->Buffer[pFrame->Size];
+
+    if (crc != FCP_CalcCRC(pFrame))
+    {
+      return LISTENER_STATUS_CRC_ERROR;
+    }
+
+    // TODO something with the response
+    // payload = bytearray(incomming[STM.PAYLOAD_IDX:payloadLen+STM.PAYLOAD_IDX])
+    if( (pFrame->Size + CRC_OFFSET + 1) < lsize)
+      Buffer = &Buffer[pFrame->Size + CRC_OFFSET + 1];
+    else
+      Buffer = NULL;
+
+    *size -= pFrame->Size + CRC_OFFSET + 1;
+
+    return LISTENER_STATUS_OK;
+  }
   return 0;
 }
-
-
 
 int32_t fcp_receive( void * pHandle, uint8_t * buffer, uint32_t * size )
 {
     uint32_t lsize = *size, nsize;
     uint8_t * pBuffer = buffer;
+    int32_t ret = LISTENER_STATUS_OK;
     while( pBuffer && (lsize > 0) )
     {
         nsize = lsize;
-        pBuffer = fsp_frame_parse(pBuffer, &lsize);
+        ret = fsp_frame_parse(pBuffer, &lsize);
+        if(ret)
+        {
+          //TODO Diag
+        }
 
         if( lsize == nsize )
           break;
     }
-    if ( (buffer == pBuffer) || (*size = lsize) )
-      return 1;
     buffer = pBuffer;
     *size = lsize;
-    return 0;
+    return ret;
 }
 
