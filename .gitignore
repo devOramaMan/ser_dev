@@ -21,3 +21,4 @@ inc/stamp-h1
 *.o
 *.log
 *.Po
+*.in
