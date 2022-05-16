@@ -14,9 +14,12 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <getopt.h>
+#include "util_common.h"
 
 #include "ftdi_term.h"
 #include "ftdi_connect.h"
+#include "diagnostics.h"
+
 
 void print_help(void);
 
@@ -50,6 +53,7 @@ void print_help(void)
     printf("-v [0-3] -verbose [0-3] debug print out level\n");
     printf("-ver print version\n");
     printf("-t -term run ftdi terminal\n");
+    printf("-c [sn/com] - connect to device");
     printf("-h -help print help\n\n");
 }
 
@@ -57,11 +61,15 @@ int main(int argc, char *argv[])
 {
     int opt;
     bool terminal = false;
+    bool connected = false;
     int debug_level = 0;
     int device_num = -1;
     int baud = 1000000;
     int tmp;
     char ser_sn[30];
+    //char char_choice[3];
+
+
     setvbuf(stdout, NULL, _IONBF, 0); 
 
     if (argc > 1)
@@ -75,8 +83,10 @@ int main(int argc, char *argv[])
                 return 0;
                 break;
             case VERBOSE_ARG:
-                debug_level = atoi(optarg);
-                printf("Verbose level set: %d\n", debug_level);
+                debug_level = atoi(optarg);                
+                diag_set_verbose(debug_level);
+                DiagMsg( DIAG_INFO,"Verbose level set: %d\n", debug_level);
+                break;
             case FTDI_TERMINAL_ARG:
                 terminal = true;
                 break;
@@ -95,7 +105,7 @@ int main(int argc, char *argv[])
                 break;
             case '?':
             default:
-                printf("Unknown argument\n");
+                DiagMsg(DIAG_ERROR,"Unknown argument\n");
                 print_help();
                 return 1;
             }
@@ -103,7 +113,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        printf("Missing Argument\n");
+        DiagMsg(DIAG_ERROR,"Missing Argument\n");
         print_help();
     }
 
@@ -111,14 +121,19 @@ int main(int argc, char *argv[])
     // which are not parsed
     for(; optind < argc; optind++)
     {     
-        printf("unknown extra option: %s\n", argv[optind]);
+        DiagMsg(DIAG_ERROR,"unknown extra option: %s\n", argv[optind]);
     }
 
     if(device_num != -1)
     {
         if((tmp = connect(device_num, baud)))
         {
-            printf("Failed to connect to device num %d (sn %s)", device_num, ser_sn);
+            DiagMsg(DIAG_ERROR, "Failed to connect to device num %d (sn %s)", device_num, ser_sn);
+        }
+        else
+        {
+            DiagMsg(DIAG_INFO,"Connected to %s (dev %d, baud %d)", ser_sn, device_num, baud);
+            connected = true;
         }
     }
 
@@ -128,9 +143,13 @@ int main(int argc, char *argv[])
     }
     else
     {
-        close_device();
-    }
-
+        if(connected)
+        {
+            printf("type any char to exit..");
+            getchar();
+            close_device();
+        }
+    }        
 
     return 0;
 }

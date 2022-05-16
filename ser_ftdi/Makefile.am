@@ -5,4 +5,4 @@ LIB =
 
 bin_PROGRAMS = ser_ftdi
 
-ser_ftdi_SOURCES = ftdi_connect.c ftdi_atomic.c fcp_frame_protocol.c kmc_rec_protocol.c ftdi_term.c ftdi_listener.c ser_ftdi.c
+ser_ftdi_SOURCES = diagnostics.c ftdi_connect.c ftdi_atomic.c fcp_frame_protocol.c kmc_rec_protocol.c ftdi_term.c ftdi_listener.c ser_ftdi.c
