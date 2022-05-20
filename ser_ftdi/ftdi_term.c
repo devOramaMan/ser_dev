@@ -2,6 +2,8 @@
 #include "ftdi_term.h"
 #include "ftdi_listener.h"
 #include "ftdi_connect.h"
+#include "fcp_term.h"
+#include "util_common.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -21,21 +23,7 @@
 #include <unistd.h>
 
 
-#ifdef NO_CLEAR
-#define CLEAR_SCREEN()
-#else
-#ifdef _WIN32
-#ifdef __CYGWIN__
-#define  CLEAR_SCREEN() system("clear")
-#else
-#define  CLEAR_SCREEN() system("cls")
-#endif
-#elif __linux__
-#define  CLEAR_SCREEN() system("clear")
-#else
-#define CLEAR_SCREEN()
-#endif
-#endif
+
 
 bool get_term_baud_rate(int * local_baud_rate);
 
@@ -43,7 +31,7 @@ bool get_term_baud_rate(int * local_baud_rate);
 void ftdi_menu(void)
 {
 	int baud_rate = 115200;
-	char char_choice[3];
+	char char_choice[50];
 	int int_choice = 0;
 	int err;
 	uint32_t numDevs;
@@ -54,6 +42,23 @@ void ftdi_menu(void)
 	// FTDI Menu
 	do
 	{
+		// If connected, display the connected device info.
+		if (pCurrentDev)
+		{
+			devInfo = pCurrentDev->pDevInfo;
+			printf("\n");
+			printf("Connected Device: %d:\n", pCurrentDev->devid);
+			if(devInfo)
+			{
+				printf(" 	Flags:         0x%02X\n", devInfo->Flags);
+				printf(" 	Type:          0x%02X\n", devInfo->Type);
+				printf(" 	ID:            0x%02X\n", devInfo->ID);
+				printf(" 	Local ID:      0x%02X\n", devInfo->LocId);
+				printf(" 	Serial Number: %s\n", devInfo->SerialNumber);
+				printf(" 	Description:   %s\n", devInfo->Description);
+				printf(" 	ftHandle =     %p\n", devInfo->ftHandle);
+			}
+		}
 
 		printf("FTDI Menu: ");
 		if (pCurrentDev)
@@ -93,26 +98,12 @@ void ftdi_menu(void)
 		{
 			printf("7. Disable ftdi device diagnostics\n");
 		}
+		if (pCurrentDev && (isRunning()))
+		{
+			printf("8. FCP Menu.\n");
+		}
 
 		printf("9. Exit\n");
-
-		// If connected, display the connected device info.
-		if (pCurrentDev)
-		{
-			devInfo = pCurrentDev->pDevInfo;
-			printf("\n");
-			printf("Connected Device: %d:\n", pCurrentDev->devid);
-			if(devInfo)
-			{
-				printf(" 	Flags:         0x%02X\n", devInfo->Flags);
-				printf(" 	Type:          0x%02X\n", devInfo->Type);
-				printf(" 	ID:            0x%02X\n", devInfo->ID);
-				printf(" 	Local ID:      0x%02X\n", devInfo->LocId);
-				printf(" 	Serial Number: %s\n", devInfo->SerialNumber);
-				printf(" 	Description:   %s\n", devInfo->Description);
-				printf(" 	ftHandle =     %p\n", devInfo->ftHandle);
-			}
-		}
 
 		// Get user choice.
 		scanf("%s", char_choice);
@@ -195,6 +186,9 @@ void ftdi_menu(void)
 			{
 				start_diagnostics_print(false);
 			}
+			break;
+		case 8:
+			fcp_menu();
 			break;
 		case 9:
 			// main_menu();

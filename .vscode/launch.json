@@ -5,14 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C++ Launch",
+            "name": "C++ Launch ser_ftdi",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${fileDirname}/${fileBasenameNoExtension}.exe",
+            "program": "${workspaceRoot}/ser_ftdi/ser_ftdi.exe",
             "args": [
                 "-c",
 				"FT4YBP6U",
-                "-t"
+                "-t",
+                "-v",
+                "4"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

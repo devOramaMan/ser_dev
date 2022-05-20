@@ -14,11 +14,14 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <getopt.h>
-#include "util_common.h"
+#include "protocol_common.h"
 
 #include "ftdi_term.h"
 #include "ftdi_connect.h"
-#include "diagnostics.h"
+#include "diagnostics_util.h"
+#include "atomic_queue.h"
+#include "ftdi_atomic.h"
+#include "ftdi_listener.h"
 
 
 void print_help(void);
@@ -32,6 +35,10 @@ void print_help(void);
 #define BAUDRATE_ARG 105
 
 static const char version[] = "0.1.0";
+
+extern Protocol_t * init_fcp(PROC_SIGNAL RxSignal, RX_TX_FUNC TxQueue);
+extern int32_t fcp_receive( Protocol_t * pHandle, uint8_t *Buffer, uint32_t * Size );
+extern void register_protocol(void *pHandler, PROTOCOL_CALLBACK prot);
 
 
 const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},
@@ -85,7 +92,7 @@ int main(int argc, char *argv[])
             case VERBOSE_ARG:
                 debug_level = atoi(optarg);                
                 diag_set_verbose(debug_level);
-                DiagMsg( DIAG_INFO,"Verbose level set: %d\n", debug_level);
+                DiagMsg( DIAG_INFO,"Verbose level set: %d", debug_level);
                 break;
             case FTDI_TERMINAL_ARG:
                 terminal = true;
@@ -96,12 +103,12 @@ int main(int argc, char *argv[])
             case CONNECT_ARG:
                 snprintf(ser_sn,sizeof(ser_sn),optarg);
                 if(!get_device(ser_sn, &device_num))
-                    printf("Failed to find: %s\n", ser_sn);
+                    DiagMsg( DIAG_ERROR, "Failed to find: %s", ser_sn);
                 break;
             case BAUDRATE_ARG:
                 tmp = atoi(optarg);
                 if (!tmp)
-                    printf("Failed to get baud argument (using default %d)", baud);
+                    DiagMsg( DIAG_ERROR,"Failed to get baud argument (using default %d)", baud);
                 break;
             case '?':
             default:
@@ -137,14 +144,28 @@ int main(int argc, char *argv[])
         }
     }
 
+    
+
+
     if ( terminal )
     {
+        
+        Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
+        register_protocol((void*)fcp, fcp_receive);
+        start_queue_thread(Write_Atomic);
+        if(connected)
+            start_listener(true);        
         ftdi_menu();
+        close_device();
     }
     else
     {
         if(connected)
         {
+            Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
+            register_protocol((void*)fcp, fcp_receive);
+            start_listener(true);
+            start_queue_thread(Write_Atomic);
             printf("type any char to exit..");
             getchar();
             close_device();

@@ -1,34 +1,33 @@
 
 #include <stdint.h>
+#include <ctype.h>
+#include "config.h"
 
-#define LISTENER_STATUS_OK                0x00
+#ifndef UTIL_COMMON
+#define UTIL_COMMON
 
-#define LISTENER_STATUS_TRANSFER_ONGOING  0x01
-#define LISTENER_STATUS_WAITING_TRANSFER  0x02
-#define LISTENER_STATUS_INVALID_PARAMETER 0x03
-#define LISTENER_STATUS_TIME_OUT          0x04
-#define LISTENER_STATUS_INVALID_FRAME     0x05
 
-#define LISTENER_STATUS_UNDERFLOW         0x06
-#define LISTENER_STATUS_INVALID_CODE      0x07
-#define LISTENER_STATUS_CRC_ERROR         0x08
+#ifdef NO_CLEAR
+#define CLEAR_SCREEN()
+#else
+#ifdef _WIN32
+#ifdef __CYGWIN__
+#define  CLEAR_SCREEN() system("clear")
+#else
+#define  CLEAR_SCREEN() system("cls")
+#endif
+#elif __linux__
+#define  CLEAR_SCREEN() system("clear")
+#else
+#define CLEAR_SCREEN()
+#endif
 
-#define MAX_PRINT_SIZE 122
+#endif
 
-typedef enum
-{
-	DIAG_ERROR,
-	DIAG_WARNING,	
-	DIAG_INFO,
-	DIAG_DEBUG,
-	DIAG_RXMSG,
-	DIAG_TXMSG,
-    DIAG_UNKNOWN
-}DiagnosticType;
 
-typedef void(*FS_CALLBACK)(DiagnosticType type, const char* str, ...);
 
-extern volatile FS_CALLBACK pFSCallback;
+int32_t isNumber(char * s, int32_t size);
 
-#define DiagMsg(A,C,...) pFSCallback(A,C,##__VA_ARGS__)
+
+#endif 
 

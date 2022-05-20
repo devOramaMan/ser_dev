@@ -54,12 +54,12 @@ int connect(int dev , int baudrate)
 		close_device();	
 	}
 
-	if( (ret = FT_Open_atomic(dev, &pdevInfo[dev].ftHandle)) )
+	if( (ret = FT_Open_Atomic(dev, &pdevInfo[dev].ftHandle)) )
         return ret;
 
 
 	// Set default baud rate.
-	if( !(ret = FT_SetBaudRate_atomic(pdevInfo[dev].ftHandle, baudrate)) )
+	if( !(ret = FT_SetBaudRate_Atomic(pdevInfo[dev].ftHandle, baudrate)) )
         setCurrentDev(dev, baudrate, &pdevInfo[dev]);
 
 	return ret;
@@ -71,7 +71,7 @@ int close_device(void)
 	if(!pCurrentDev)
 		return ret;
 	
-	return FT_Close_atomic(pCurrentDev->ftHandle);
+	return FT_Close_Atomic(pCurrentDev->ftHandle);
 }
 
 FT_DEVICE_LIST_INFO_NODE * get_device_info(uint32_t * numDevs)
@@ -121,10 +121,10 @@ int reset_device(int local_baud_rate)
     int ret;
 	if(!pCurrentDev)
 		return false;
-	if ( (ret = (int) FT_ResetPort_atomic(pCurrentDev->ftHandle)) )
+	if ( (ret = (int) FT_ResetPort_Atomic(pCurrentDev->ftHandle)) )
         return ret;
 	Sleep(50);
-	return FT_SetBaudRate_atomic(pCurrentDev->ftHandle, local_baud_rate);
+	return FT_SetBaudRate_Atomic(pCurrentDev->ftHandle, local_baud_rate);
 }
 
 int set_baud_rate(int baud_rate)
@@ -133,7 +133,7 @@ int set_baud_rate(int baud_rate)
     if (!pCurrentDev)
         return 1;
 
-    if( !(ret = FT_SetBaudRate_atomic(pCurrentDev->ftHandle, baud_rate)) )
+    if( !(ret = FT_SetBaudRate_Atomic(pCurrentDev->ftHandle, baud_rate)) )
         pCurrentDev->baud = baud_rate;
     
     return ret;
