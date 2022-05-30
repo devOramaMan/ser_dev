@@ -35,15 +35,16 @@ typedef struct
 } Atomic_Queue_Handler_t;
 
 Atomic_Queue_Handler_t atomic_queue_handler =
-    {
-        .head = NULL,
-        .MsgCnt = 0,
-        .enqueued = PTHREAD_COND_INITIALIZER,
-        .dequeued = PTHREAD_COND_INITIALIZER,
-        .lock = PTHREAD_MUTEX_INITIALIZER,
-        .timeout = 3,
-        .retry = 0,
-        .run = false};
+{
+  .head = NULL,
+  .MsgCnt = 0,
+  .enqueued = PTHREAD_COND_INITIALIZER,
+  .dequeued = PTHREAD_COND_INITIALIZER,
+  .lock = PTHREAD_MUTEX_INITIALIZER,
+  .timeout = 3,
+  .retry = 0,
+  .run = false
+};
 
 void *thread_queue(void *arg);
 
@@ -82,6 +83,10 @@ void *thread_queue(void *arg)
           DiagMsg(DIAG_ERROR, "Inconsistend send data %d != %d", msg->size, sentBytes);
         if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
           DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->id);
+        else
+        {
+          DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->id);
+        }
       }
       else
       {
@@ -178,6 +183,7 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size)
 
   if (addCnt)
   {
+    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->id);
     pthread_cond_signal( &(atomic_queue_handler.enqueued) );
   }
   else

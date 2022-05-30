@@ -23,3 +23,9 @@ inc/stamp-h1
 *.Po
 *.in
 *.TPo
+autom4te.cache/output.2
+autom4te.cache/traces.2
+build-aux/config.guess~
+build-aux/config.sub~
+INSTALL
+Makefile.in

@@ -55,6 +55,7 @@ uint8_t fcp_code[] = { FCP_CODE_ACK, FCP_CODE_NACK };
 FCP_Handle_t fcp_handle =
 {
   ._super.Code = fcp_code,
+  ._super.Size = sizeof(fcp_code),
   ._super.Diag = { 0,0,0,0,0, false },
   ._super.MsgCnt = 0,
   .RxSignal = NULL,
@@ -134,20 +135,31 @@ inline int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t *size)
 
 int32_t fcp_receive(Protocol_t *pHandle, uint8_t *buffer, uint32_t *size)
 {
-  uint32_t lsize = *size, nsize;
+  uint32_t lsize = *size;
   uint8_t *pBuffer = buffer;
-  int32_t ret = PROTOCOL_STATUS_OK;
-  while (pBuffer && (lsize > 0))
-  {
-    nsize = lsize;
-    ret = fcp_frame_parse(pBuffer, &lsize);
-    if (ret)
-    {
-      // TODO Diag
-    }
+  int32_t ret = PROTOCOL_STATUS_INVALID_CODE;
+  FCP_Handle_t * pFcpHandle = (FCP_Handle_t*) pHandle;
 
-    if (lsize == nsize)
-      break;
+  if (pBuffer && (lsize > 0))
+  {
+    ret = fcp_frame_parse(pBuffer, &lsize);
+    if (!ret)
+    {
+      ret = PROTOCOL_STATUS_OK;
+      DiagMsg(DIAG_DEBUG,"Valid FCP MSG");
+      pFcpHandle->RxSignal();
+      pHandle->Diag.MSG_OK++;
+    }
+    else
+    {
+      if(ret == PROTOCOL_STATUS_CRC_ERROR)
+        pHandle->Diag.CRC_ERROR++;
+      
+      if(ret == PROTOCOL_STATUS_INVALID_CODE)
+        pHandle->Diag.UNKNOWN_MSG++;
+      
+      pHandle->Diag.RX_ERROR++;
+    }
   }
   buffer = pBuffer;
   *size = lsize;
@@ -157,7 +169,7 @@ int32_t fcp_receive(Protocol_t *pHandle, uint8_t *buffer, uint32_t *size)
 
 int32_t fcp_write_register_async(int32_t reg, int32_t frameid, int32_t motor_select, int32_t value, int32_t size, Data_Type type)
 {
-  int32_t ret;
+  int32_t ret, i;
   FCP_Frame_t msg;
   int32_t crc_idx;
 
@@ -196,18 +208,19 @@ int32_t fcp_write_register_async(int32_t reg, int32_t frameid, int32_t motor_sel
     break;
   default:
     DiagMsg(DIAG_ERROR, "Format not supported");
-    break;
+    return 1;
   }
   msg.Buffer[crc_idx] = fcp_calc_crc(&msg);
 
-  ret = fcp_handle.TxQueue((uint8_t*)&msg, 4);
+  for(i = 0; i < 5; i++)
+    ret = fcp_handle.TxQueue((uint8_t*)&msg, 4);
 
   return ret;
 }
 
 int32_t fcp_read_register_async(int32_t reg, int32_t frameid, int32_t motor_select, Data_Type type)
 {
-  int32_t ret;
+  int32_t ret, i;
   FCP_Frame_t msg;
 
   msg.Code = (motor_select << 5);
@@ -216,7 +229,8 @@ int32_t fcp_read_register_async(int32_t reg, int32_t frameid, int32_t motor_sele
   msg.Buffer[0] = (uint8_t)reg;
   msg.Buffer[1] = fcp_calc_crc(&msg);
 
-  ret = fcp_handle.TxQueue((uint8_t*)&msg, 4);
+  for(i = 0; i < 5; i++)
+    ret = fcp_handle.TxQueue((uint8_t*)&msg, 4);
 
   return ret;
 }

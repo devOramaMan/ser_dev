@@ -57,7 +57,7 @@ void print_help(void)
     printf("\n");
     printf("ser_ftdi.exe - serial ftdi interface (version: %s)\n", version);
     printf("\n");
-    printf("-v [0-3] -verbose [0-3] debug print out level\n");
+    printf("-v [0-x] -verbose [0-x] debug print out level\n");
     printf("-ver print version\n");
     printf("-t -term run ftdi terminal\n");
     printf("-c [sn/com] - connect to device");

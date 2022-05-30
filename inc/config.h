@@ -42,9 +42,6 @@
 /* Define to 1 if you have the `udev' library (-ludev). */
 /* #undef HAVE_LIBUDEV */
 
-/* Define to 1 if you have the <memory.h> header file. */
-/* #undef HAVE_MEMORY_H */
-
 /* Define to 1 if the system has the type `nfds_t'. */
 /* #undef HAVE_NFDS_T */
 
@@ -62,6 +59,9 @@
 
 /* Define to 1 if you have the <stdint.h> header file. */
 /* #undef HAVE_STDINT_H */
+
+/* Define to 1 if you have the <stdio.h> header file. */
+/* #undef HAVE_STDIO_H */
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 /* #undef HAVE_STDLIB_H */
@@ -120,7 +120,9 @@
 /* Define to 1 if compiling for a Windows platform. */
 #define PLATFORM_WINDOWS 1
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 /* #undef STDC_HEADERS */
 
 /* UMockdev hotplug code is not racy */

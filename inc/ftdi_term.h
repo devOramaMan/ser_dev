@@ -12,7 +12,6 @@
 
 // Lists FTDI commands.
 void ftdi_menu(void);
-void quick_connect(void);
 bool connect_device(int * local_baud_rate);
 
 

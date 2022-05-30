@@ -25,6 +25,7 @@
 
 
 
+void quick_connect(int local_baud_rate);
 bool get_term_baud_rate(int * local_baud_rate);
 
 
@@ -79,10 +80,7 @@ void ftdi_menu(void)
 		{
 			printf("4. Close Device\n");
 		}
-		if (!isRunning()) // Only give display if connected.
-		{
-			printf("5. Change/set baud-rate\n");
-		}
+		printf("5. Change/set baud-rate\n");
 		if (pCurrentDev) // Only give display if connected.
 		{
 			if (!isRunning())
@@ -114,7 +112,7 @@ void ftdi_menu(void)
 		switch (int_choice)
 		{
 		case 1:
-			quick_connect();
+			quick_connect(baud_rate);
 		case 2:
 			devInfo =  get_device_info(&numDevs);
 			if(!numDevs || !devInfo)
@@ -154,6 +152,7 @@ void ftdi_menu(void)
 		case 5:
 			if(get_term_baud_rate(&baud_rate))
 			{
+				printf("baudrate set to %d\n" , baud_rate);
 				if(pCurrentDev)
 				{
 					// set_baud_flag is not used, yet.
@@ -164,6 +163,8 @@ void ftdi_menu(void)
 						printf("Baudrate set to %d", baud_rate);
 				}
 			}
+			else
+				printf("Failed to set baudrate (current: %d)\n" , baud_rate);
 			break;
 		case 6:
 			if (!isRunning())
@@ -209,9 +210,8 @@ void ftdi_menu(void)
 	} while (int_choice != 99);
 }
 
-void quick_connect(void)
+void quick_connect(int local_baud_rate)
 {
-	int local_baud_rate = 115200;
 	uint32_t numDevs;
 
 	// Create and get the device information list
@@ -280,7 +280,7 @@ bool connect_device(int * local_baud_rate)
 
 bool get_term_baud_rate(int * local_baud_rate)
 {	 
-	char char_choice[3];
+	char char_choice[50];
 	int int_choice = 0;
 
 	CLEAR_SCREEN();
@@ -291,6 +291,7 @@ bool get_term_baud_rate(int * local_baud_rate)
 	printf("4. 57600\n");
 	printf("5. 115200\n");
 	printf("6. 230400\n");
+	printf("Custom. > 9600\n");
 	printf("9. Exit\n");
 
 	scanf("%s", char_choice);
@@ -319,8 +320,16 @@ bool get_term_baud_rate(int * local_baud_rate)
 		case 9:
 			return false;
 			break;
-		default:printf("""Bad choice. Hot glue!""");
-			return false;
+		default:
+			if(int_choice < 9600)
+			{
+				printf("""Bad choice. Hot glue!\n""");
+				return false;
+			}
+			else
+			{
+				*local_baud_rate = int_choice;
+			}			
 		    break;
 	}
 	return true;
