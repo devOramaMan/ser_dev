@@ -89,7 +89,7 @@ void *threadlistener(void *arg)
     uint64_t timestamp_now, timestamp_last;
     uint8_t RxBuffer[256];
     uint8_t *pBuffer;
-    uint8_t i, code;
+    uint8_t i;
     HANDLE hEvent;
     PROTOCOL_CALLBACK callback;
     //EVENT_HANDLE eh;
@@ -125,24 +125,24 @@ void *threadlistener(void *arg)
             FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
             if (RxBytes > 0)
             {
-                ftStatus = FT_Read(pCurrentDev->ftHandle, RxBuffer, RxBytes, &BytesReceived);
+                ftStatus = FT_Read(pCurrentDev->ftHandle, RxBuffer, RxBytes, &alen);
                 pthread_mutex_unlock(&ftdi_read_mutex);
                 if (ftStatus == FT_OK)
                 {
                     // send to pool
                     pBuffer = RxBuffer;
-                    len = BytesReceived;
-                    while(len > 0)
+                    slen = alen;
+                    while(slen > 0)
                     {
 
                         for (i = 0; i < ftdi_listener_handle.size; i++)
                         {
 
-                             = ftdi_listener_handle.ProtocolList[i].pCallback;
+                            callback = ftdi_listener_handle.ProtocolList[i].pCallback;
                             if (callback)
-                                callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &len);
+                                callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &slen);
 
-                            if (len > 0 && pBuffer)
+                            if (slen > 0 && pBuffer)
                             {
                                 ftdi_listener_handle.Diag.UNKNOWN_MSG++;
                             }
