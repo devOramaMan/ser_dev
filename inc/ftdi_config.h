@@ -17,6 +17,6 @@ typedef struct ftdi_config
 
 extern ftdi_config_t * pCurrentDev;
 
-extern pthread_mutex_t ftdi_read_mutex; 
+extern pthread_mutex_t ftdi_read_mutex;
 
 #endif /* ftdi_config.h */

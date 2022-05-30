@@ -2,6 +2,7 @@
 
 #include "ftdi_connect.h"
 #include "ftdi_atomic.h"
+#include "diagnostics_util.h"
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -42,7 +43,8 @@ void setCurrentDev(int devid, int baud, FT_DEVICE_LIST_INFO_NODE * devInfo )
 
 int connect(int dev , int baudrate)
 {
-	int ret;
+	int32_t ret;
+	uint32_t lComPortNumber;
 
     if(!pdevInfo)
 	{
@@ -57,10 +59,21 @@ int connect(int dev , int baudrate)
 	if( (ret = FT_Open_Atomic(dev, &pdevInfo[dev].ftHandle)) )
         return ret;
 
+	ret = (int32_t) FT_GetComPortNumber(pdevInfo[dev].ftHandle,(LPLONG)&lComPortNumber) ;
 
+	if( ret )
+		DiagMsg(DIAG_ERROR,"Failed to get com port number (err %d)", ret);
+	else
+		DiagMsg(DIAG_INFO, "COM%d Connected!", lComPortNumber);
+
+	DiagMsg(DIAG_INFO, "purge %d", (int)FT_Purge(pdevInfo[dev].ftHandle, FT_PURGE_RX | FT_PURGE_TX)); // Purge both Rx and Tx buffers
+
+	DiagMsg(DIAG_INFO,"sentstat %d",(int)FT_Write(pdevInfo[dev].ftHandle, (uint8_t*)"tull", 4, (LPDWORD)&ret));
 	// Set default baud rate.
 	if( !(ret = FT_SetBaudRate_Atomic(pdevInfo[dev].ftHandle, baudrate)) )
         setCurrentDev(dev, baudrate, &pdevInfo[dev]);
+
+
 
 	return ret;
 }

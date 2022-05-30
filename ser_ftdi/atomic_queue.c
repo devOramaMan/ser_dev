@@ -75,13 +75,19 @@ void *thread_queue(void *arg)
       // Todo handle send delay
       // Wait for received condition
       time_to_wait.tv_sec = time(NULL) + pQHandler->timeout;
-      if(!pQHandler->sendFunc(msg->data, msg->size, &sentBytes))
+      stat = pQHandler->sendFunc(msg->data, msg->size, &sentBytes);
+      if(!stat)
       {
         if(msg->size != sentBytes)
           DiagMsg(DIAG_ERROR, "Inconsistend send data %d != %d", msg->size, sentBytes);
         if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
           DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->id);
       }
+      else
+      {
+        DiagMsg(DIAG_ERROR, "Failed to send msg (err %d)", stat);
+      }
+
       msg = msg->next;
     }
 

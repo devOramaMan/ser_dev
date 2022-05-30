@@ -98,7 +98,7 @@ void ftdi_menu(void)
 		{
 			printf("7. Disable ftdi device diagnostics\n");
 		}
-		if (pCurrentDev && (isRunning()))
+		if (pCurrentDev)// && (isRunning()))
 		{
 			printf("8. FCP Menu.\n");
 		}

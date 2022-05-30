@@ -85,11 +85,14 @@ void *threadlistener(void *arg)
     DWORD EventDWord;
     DWORD TxBytes;
     DWORD RxBytes;
-    DWORD BytesReceived, len;
+    DWORD slen,alen;
     uint64_t timestamp_now, timestamp_last;
     uint8_t RxBuffer[256];
     uint8_t *pBuffer;
-    uint8_t i;
+    uint8_t i, code;
+    HANDLE hEvent;
+    PROTOCOL_CALLBACK callback;
+    //EVENT_HANDLE eh;
 
     timestamp_last = time(NULL);
     if (pCurrentDev)
@@ -104,6 +107,21 @@ void *threadlistener(void *arg)
         // Check inside the mutex
         if (pCurrentDev)
         {
+            hEvent = CreateEvent(NULL,
+                                 false, // auto-reset event
+                                 false, // non-signalled state
+                                 "");
+            EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS;   
+            ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,hEvent);
+            if(ftStatus)
+            {
+                DiagMsg(DIAG_ERROR, "listener failed to create event");
+                pthread_mutex_unlock(&ftdi_read_mutex);
+                break;
+            }
+            pthread_mutex_unlock(&ftdi_read_mutex);
+            WaitForSingleObject(hEvent,INFINITE);
+            pthread_mutex_lock(&ftdi_read_mutex);
             FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
             if (RxBytes > 0)
             {
@@ -114,15 +132,20 @@ void *threadlistener(void *arg)
                     // send to pool
                     pBuffer = RxBuffer;
                     len = BytesReceived;
-                    for (i = 0; i < ftdi_listener_handle.size; i++)
+                    while(len > 0)
                     {
-                        PROTOCOL_CALLBACK callback = ftdi_listener_handle.ProtocolList[i].pCallback;
-                        if (callback)
-                            callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &len);
 
-                        if (len > 0 && pBuffer)
+                        for (i = 0; i < ftdi_listener_handle.size; i++)
                         {
-                            ftdi_listener_handle.Diag.UNKNOWN_MSG++;
+
+                             = ftdi_listener_handle.ProtocolList[i].pCallback;
+                            if (callback)
+                                callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &len);
+
+                            if (len > 0 && pBuffer)
+                            {
+                                ftdi_listener_handle.Diag.UNKNOWN_MSG++;
+                            }
                         }
                     }
                 }

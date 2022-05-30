@@ -4,6 +4,7 @@
 #include "protocol_common.h"
 #include "func_common.h"
 #include <stddef.h>
+#include "diagnostics_util.h"
 
 /** Defines ----------------------------------------------------------------*/
 
@@ -156,15 +157,52 @@ int32_t fcp_receive(Protocol_t *pHandle, uint8_t *buffer, uint32_t *size)
 
 int32_t fcp_write_register_async(int32_t reg, int32_t frameid, int32_t motor_select, int32_t value, int32_t size, Data_Type type)
 {
-  // int32_t ret;
-  // ret = 0;
+  int32_t ret;
   FCP_Frame_t msg;
+  int32_t crc_idx;
+
 
   msg.Code = (motor_select << 5);
   msg.Code |= frameid & ~(0xE0);
-  //msg.Size =  
-  //msg.Code = &= ~(1UL << n);
-  return msg.Code;
+  msg.Buffer[0] = (uint8_t)reg;
+  switch (type)
+  {
+  case INTEGER8:
+  case UNSIGNED8:
+    msg.Size = 1;
+    msg.Buffer[1] = (uint8_t) value;
+    crc_idx = 2;
+    break;
+  case INTEGER16:
+  case UNSIGNED16:
+    msg.Size = 2;
+    msg.Buffer[1] = (uint8_t) (value >> 8); // MSB
+    msg.Buffer[2] = (uint8_t) (value & 0xFF); //LSB
+    crc_idx = 3;
+    break;
+  case INTEGER32:
+  case UNSIGNED32:
+    msg.Size = 4;
+    //TODO Verify endian
+    msg.Buffer[2] = (uint8_t) (value >> 16);
+    msg.Buffer[1] = (uint8_t) (value & 0xFF00);
+    msg.Buffer[3] = (uint8_t) (value >> 8);
+    msg.Buffer[4] = (uint8_t) (value & 0xFF);
+    crc_idx = 5;
+  case REAL32:
+  //TODO Verify endian and add float conversion
+    msg.Size = 4;
+    crc_idx = 5;
+    break;
+  default:
+    DiagMsg(DIAG_ERROR, "Format not supported");
+    break;
+  }
+  msg.Buffer[crc_idx] = fcp_calc_crc(&msg);
+
+  ret = fcp_handle.TxQueue((uint8_t*)&msg, 4);
+
+  return ret;
 }
 
 int32_t fcp_read_register_async(int32_t reg, int32_t frameid, int32_t motor_select, Data_Type type)

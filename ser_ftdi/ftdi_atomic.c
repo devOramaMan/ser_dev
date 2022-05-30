@@ -128,7 +128,7 @@ int32_t Read_Atomic(
   set_lock(&ftdi_read_mutex);
   if (pCurrentDev)
   {
-    ftStatus = FT_Read_Atomic(pCurrentDev, lpBuffer, dwBytesToRead, lpBytesReturned );
+    ftStatus = FT_Read(pCurrentDev->ftHandle, lpBuffer, dwBytesToRead, lpBytesReturned );
   }
   un_lock(&ftdi_read_mutex);
   return (int32_t) ftStatus;
@@ -143,7 +143,7 @@ int32_t Write_Atomic(
   set_lock(&ftdi_write_mutex);
   if (pCurrentDev)
   {
-    ftStatus = FT_Write_Atomic( pCurrentDev, lpBuffer, dwBytesToRead, lpBytesReturned );
+    ftStatus = FT_Write( pCurrentDev->ftHandle, lpBuffer, dwBytesToRead, lpBytesReturned );
   }
   un_lock(&ftdi_write_mutex);
   return (int32_t) ftStatus;
