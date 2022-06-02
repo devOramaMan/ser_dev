@@ -55,7 +55,10 @@
         "filesystem": "c",
         "limits": "c",
         "types.h": "c",
-        "diagnostics_util.h": "c"
+        "diagnostics_util.h": "c",
+        "wintypes.h": "c",
+        "ctype.h": "c",
+        "pthread.h": "c"
     },
     "files.exclude": {
         "**/.o": true,
