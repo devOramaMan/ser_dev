@@ -1,4 +1,4 @@
-
+#include "config.h"
 #include "ftdi_config.h"
 
 #ifndef FTDI_ATOMIC

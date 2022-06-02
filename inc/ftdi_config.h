@@ -2,9 +2,18 @@
 #include "ftd2xx.h"
 #include <pthread.h>
 
+
 #ifndef FTDI_CONFIG
 #define FTDI_CONFIG
 
+#ifdef _WIN32
+typedef struct _EVENT_HANDLE
+{
+    pthread_cond_t  eCondVar;
+    pthread_mutex_t eMutex;
+    int             iVar;
+} EVENT_HANDLE;
+#endif
 
 
 typedef struct ftdi_config
@@ -17,6 +26,6 @@ typedef struct ftdi_config
 
 extern ftdi_config_t * pCurrentDev;
 
-extern pthread_mutex_t ftdi_read_mutex;
+extern EVENT_HANDLE * eh;
 
 #endif /* ftdi_config.h */

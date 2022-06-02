@@ -32,6 +32,10 @@ typedef struct
   bool Diag_Ena;
   bool Running;
   Protocol_Diag_t Diag;
+  #ifdef _WIN32
+  HANDLE hEvent;
+  #endif
+  EVENT_HANDLE * event;
 }Ftdi_Listener_t;
 
 Ftdi_Listener_t ftdi_listener_handle =
@@ -77,7 +81,8 @@ int start_listener(bool ena)
         else
         {
             ftdi_listener_handle.Stop = false;
-            ret = pthread_create(&threadId, NULL, &threadlistener, NULL);
+            ftdi_listener_handle.event = eh;
+            ret = pthread_create(&threadId, NULL, &threadlistener, (void*)&ftdi_listener_handle);
             if(!ret)
             {
                 ftdi_listener_handle.Running = true;
@@ -91,6 +96,12 @@ int start_listener(bool ena)
     else
     {
         ftdi_listener_handle.Stop = true;
+        #ifdef _WIN32
+        SetEvent(ftdi_listener_handle.hEvent);
+        #else
+        pthread_cond_signal( &(ftdi_listener_handle.event->eCondVar) );
+        #endif
+
     }
     return ret;
 }
@@ -111,23 +122,27 @@ void *threadlistener(void *arg)
     uint8_t RxBuffer[256];
     uint8_t *pBuffer;
     uint8_t i;
-    HANDLE hEvent;
+    Ftdi_Listener_t * pFtdiListener = (Ftdi_Listener_t*) arg;
     PROTOCOL_CALLBACK callback;
     int32_t ret;
-    //EVENT_HANDLE eh;
+    pthread_mutex_t * rLock =  &(pFtdiListener->event->eMutex);
 
     timestamp_last = time(NULL);
     if (pCurrentDev)
         printf("ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
     else
         printf("ftdi listener :: Start (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
-
-    hEvent = CreateEvent(NULL,
-                          false, // auto-reset event
-                          false, // non-signalled state
-                          "");
-    EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS;   
-    ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,hEvent);
+    EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS; 
+    #ifdef _WIN32 
+    pFtdiListener->hEvent = CreateEvent(NULL,
+                         true,  // manual-reset event
+                         false, // non-signalled state
+                         "");
+    ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,pFtdiListener->hEvent);
+    
+    #else
+    ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,(PVOID)pFtdiListener->event);
+    #endif
     if(ftStatus)
     {
       DiagMsg(DIAG_ERROR, "listener failed to create event");
@@ -138,25 +153,30 @@ void *threadlistener(void *arg)
     while ((!ftdi_listener_handle.Stop) && (pCurrentDev))
     {
         timestamp_now = time(NULL);
-        DiagMsg(DIAG_DEBUG,"wait?");
-        pthread_mutex_lock(&ftdi_read_mutex);
+        pthread_mutex_lock(rLock);
         // Check inside the mutex
         if (pCurrentDev)
         {            
             FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
             if(!RxBytes)
             {
-              pthread_mutex_unlock(&ftdi_read_mutex);
-              WaitForSingleObject(hEvent,INFINITE);
+              DiagMsg(DIAG_DEBUG, "wait for rx");
+              #ifndef _WIN32
+              pthread_cond_wait(&(q->eCondVar),&(eh->eMutex));
+              #else
+              pthread_mutex_unlock(rLock);
+              WaitForSingleObject(pFtdiListener->hEvent,INFINITE);
+              pthread_mutex_lock(rLock);
+              ResetEvent(pFtdiListener->hEvent);
+              #endif
               DiagMsg(DIAG_DEBUG, "listener wakeup");
-              pthread_mutex_lock(&ftdi_read_mutex);
+              
             }
             FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
             if (RxBytes > 0)
             {
-                DiagMsg(DIAG_DEBUG,"Read");
                 ftStatus = FT_Read(pCurrentDev->ftHandle, RxBuffer, RxBytes, &alen);
-                pthread_mutex_unlock(&ftdi_read_mutex);
+                pthread_mutex_unlock(rLock);
                 if (ftStatus == FT_OK)
                 {
                   DiagMsg(DIAG_RXMSG, "RX (len %d): ", alen);
@@ -219,12 +239,12 @@ void *threadlistener(void *arg)
             }
             else
             {
-                pthread_mutex_unlock(&ftdi_read_mutex);
+                pthread_mutex_unlock(rLock);
             }
         }
         else
         {
-            pthread_mutex_unlock(&ftdi_read_mutex);
+            pthread_mutex_unlock(rLock);
         }
 
         // TODO macro for sleep

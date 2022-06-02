@@ -6,6 +6,9 @@
 
 #include <stdint.h>
 
+/** @brief Maximum size of the payload of an FCP frame */
+#define FCP_MAX_PAYLOAD_SIZE  128
+
 typedef enum
 {
   INTEGER8 = 2,

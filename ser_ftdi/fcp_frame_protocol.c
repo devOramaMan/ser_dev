@@ -14,8 +14,6 @@
 #define ERRCODE_IDX       2
 /** @brief Size of the Header of an FCP frame */
 #define FCP_HEADER_SIZE       2
-/** @brief Maximum size of the payload of an FCP frame */
-#define FCP_MAX_PAYLOAD_SIZE  128
 /** @brief Size of the Control Sum (actually not a CRC) of an FCP frame */
 #define FCP_CRC_SIZE          1
 /** @brief Maximum size of an FCP frame, all inclusive */

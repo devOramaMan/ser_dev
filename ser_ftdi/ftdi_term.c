@@ -35,6 +35,7 @@ void ftdi_menu(void)
 	char char_choice[50];
 	int int_choice = 0;
 	int err;
+	int latency = 2, tmp;
 	uint32_t numDevs;
 	FT_DEVICE_LIST_INFO_NODE * devInfo;
 
@@ -47,8 +48,10 @@ void ftdi_menu(void)
 		if (pCurrentDev)
 		{
 			devInfo = pCurrentDev->pDevInfo;
+			FT_SetLatencyTimer(pCurrentDev->ftHandle, (UCHAR)latency);
 			printf("\n");
 			printf("Connected Device: %d:\n", pCurrentDev->devid);
+			FT_GetLatencyTimer(pCurrentDev->ftHandle, (PUCHAR)&tmp);
 			if(devInfo)
 			{
 				printf(" 	Flags:         0x%02X\n", devInfo->Flags);
@@ -58,6 +61,7 @@ void ftdi_menu(void)
 				printf(" 	Serial Number: %s\n", devInfo->SerialNumber);
 				printf(" 	Description:   %s\n", devInfo->Description);
 				printf(" 	ftHandle =     %p\n", devInfo->ftHandle);
+				printf(" 	latency  =     %d\n", tmp);
 			}
 		}
 

@@ -1,8 +1,13 @@
 
 
+#include "config.h"
 #include "ftdi_connect.h"
 #include "ftdi_atomic.h"
 #include "diagnostics_util.h"
+#include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -136,7 +141,7 @@ int reset_device(int local_baud_rate)
 		return false;
 	if ( (ret = (int) FT_ResetPort_Atomic(pCurrentDev->ftHandle)) )
         return ret;
-	Sleep(50);
+	usleep(50);
 	return FT_SetBaudRate_Atomic(pCurrentDev->ftHandle, local_baud_rate);
 }
 
