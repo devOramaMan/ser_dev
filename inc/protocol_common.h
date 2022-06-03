@@ -36,6 +36,31 @@ typedef struct protocol_base
   uint32_t MsgCnt;
 } Protocol_t;
 
+typedef enum
+{
+  INTEGER8 = 2,
+  INTEGER16 = 3,
+  INTEGER32 = 4,
+  UNSIGNED8 = 5,
+  UNSIGNED16 = 6,
+  UNSIGNED32 = 7,
+  REAL32 = 8,
+  DATA_TYPE_SIZE,
+}Data_Type;
+
+static const char dataTypeStr[DATA_TYPE_SIZE][14] =
+{
+  "int8_t   : 2",
+  "int16_t  : 3",
+  "int32_t  : 4",
+  "uint8_t  : 5",
+  "uint16_t : 6",
+  "uint32_t : 7",
+  "float    : 8"
+  "",
+  "",
+};
+
 typedef int32_t (*PROTOCOL_CALLBACK)( Protocol_t * pHandle, uint8_t * buffer, uint32_t * size );
 
 typedef struct Protocol
@@ -43,5 +68,7 @@ typedef struct Protocol
     Protocol_t * pProtocol;
     PROTOCOL_CALLBACK pCallback;
 }Protocol_Handle_t;
+
+
 
 #endif 

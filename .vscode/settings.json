@@ -58,7 +58,8 @@
         "diagnostics_util.h": "c",
         "wintypes.h": "c",
         "ctype.h": "c",
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "string.h": "c"
     },
     "files.exclude": {
         "**/.o": true,
