@@ -209,7 +209,7 @@ void *threadlistener(void *arg)
                         }
                         else
                         {
-                          if(ret == PROTOCOL_STATUS_CRC_ERROR)
+                          if(ret == PROTOCOL_CODE_CRC_ERROR)
                             ftdi_listener_handle.Diag.CRC_ERROR++;
                           else if(ret == PROTOCOL_STATUS_INVALID_CODE)
                             ftdi_listener_handle.Diag.UNKNOWN_MSG++;

@@ -55,7 +55,7 @@ uint16_t addLocalTime(char* print)
 
 uint16_t addDiagnosticType(char* print, DiagnosticType type)
 {
-	static const char DiagnosticTypeStr[][8] = {"ERROR: ", "WARN:  ",  "INFO:  ", "DEBUG: ", "UNKN:  ", "RXMSG: ", "TXMSG: "};
+	static const char DiagnosticTypeStr[][8] = {"ERROR: ", "WARN:  ",  "INFO:  ", "DEBUG: ", "RXMSG: ", "TXMSG: ", "UNKN:  "};
   memcpy(print, DiagnosticTypeStr[type], 7);
   return 7;
 }

@@ -151,14 +151,14 @@ int32_t Read_Atomic(
 
 int32_t Write_Atomic(
     uint8_t *lpBuffer,
-    uint32_t dwBytesToRead,
-    uint32_t *lpBytesReturned)
+    uint32_t dwBytesToWrite,
+    uint32_t *lpdwBytesWritten)
 {
   FT_STATUS ftStatus = 1;
   set_lock(&atomic_ftdi_handler.ftdi_write_mutex);
   if (pCurrentDev)
   {
-    ftStatus = FT_Write( pCurrentDev->ftHandle, lpBuffer, dwBytesToRead, lpBytesReturned );
+    ftStatus = FT_Write( pCurrentDev->ftHandle, lpBuffer, dwBytesToWrite, lpdwBytesWritten );
   }
   un_lock(&atomic_ftdi_handler.ftdi_write_mutex);
   return (int32_t) ftStatus;

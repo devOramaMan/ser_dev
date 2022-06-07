@@ -14,7 +14,10 @@
 
 #define PROTOCOL_STATUS_UNDERFLOW         0x06
 #define PROTOCOL_STATUS_INVALID_CODE      0x07
-#define PROTOCOL_STATUS_CRC_ERROR         0x08
+#define PROTOCOL_STATUS_NACK              0x08
+
+#define PROTOCOL_CODE_CRC_ERROR         0x80
+
 
 
 typedef struct Protocol_Diag

@@ -22,6 +22,7 @@
 #include "atomic_queue.h"
 #include "ftdi_atomic.h"
 #include "ftdi_listener.h"
+#include <unistd.h>
 
 
 void print_help(void);
@@ -36,7 +37,7 @@ void print_help(void);
 
 static const char version[] = "0.1.0";
 
-extern Protocol_t * init_fcp(PROC_SIGNAL RxSignal, RX_TX_FUNC TxQueue);
+extern Protocol_t * init_fcp(RX_TX_CODE_FUNC RxSignal, RX_TX_FUNC TxQueue);
 extern int32_t fcp_receive( Protocol_t * pHandle, uint8_t *Buffer, uint32_t * Size );
 extern void register_protocol(void *pHandler, PROTOCOL_CALLBACK prot);
 
@@ -154,7 +155,9 @@ int main(int argc, char *argv[])
         register_protocol((void*)fcp, fcp_receive);
         start_queue_thread(Write_Atomic);
         if(connected)
-            start_listener(true);        
+            start_listener(true);  
+        printf("\ntype any char to open menu..\n");
+        getchar();
         ftdi_menu();
         close_device();
     }
@@ -166,7 +169,7 @@ int main(int argc, char *argv[])
             register_protocol((void*)fcp, fcp_receive);
             start_listener(true);
             start_queue_thread(Write_Atomic);
-            printf("type any char to exit..");
+            printf("\ntype any char to exit..\n");
             getchar();
             close_device();
         }

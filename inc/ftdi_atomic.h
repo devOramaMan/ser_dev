@@ -25,8 +25,8 @@ int32_t Read_Atomic(
 
 int32_t Write_Atomic(
     uint8_t *lpBuffer,
-    uint32_t dwBytesToRead,
-    uint32_t *lpBytesReturned);
+    uint32_t dwBytesToWrite,
+    uint32_t *lpdwBytesWritten);
 
 
 

@@ -4,10 +4,12 @@
 #include "ftdi_connect.h"
 #include "ftdi_atomic.h"
 #include "diagnostics_util.h"
+#include "atomic_queue.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -88,6 +90,9 @@ int close_device(void)
     int ret = 0;
 	if(!pCurrentDev)
 		return ret;
+
+
+	stop_queue_thread();
 	
 	return FT_Close_Atomic(pCurrentDev->ftHandle);
 }

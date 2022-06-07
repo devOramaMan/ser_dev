@@ -123,7 +123,7 @@ inline int32_t kmc_frame_parse(uint8_t *Buffer, uint32_t * size)
 
     if( crc != kmc_frame_calc_CRC(pFrame) )
     {
-      return PROTOCOL_STATUS_CRC_ERROR;
+      return PROTOCOL_CODE_CRC_ERROR;
     }
 
     // TODO something with the response

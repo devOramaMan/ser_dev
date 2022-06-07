@@ -59,7 +59,9 @@
         "wintypes.h": "c",
         "ctype.h": "c",
         "pthread.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "unistd.h": "c",
+        "ftdi_listener.h": "c"
     },
     "files.exclude": {
         "**/.o": true,

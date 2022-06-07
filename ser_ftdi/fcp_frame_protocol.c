@@ -9,7 +9,7 @@
 
 /** Defines ----------------------------------------------------------------*/
 
-
+#define DEBUG_FCP_MSG 1
 
 /** @brief Index of FCP frame error code */
 #define ERRCODE_IDX       2
@@ -23,10 +23,12 @@
 #define FCP_CODE_ACK  0xF0
 /** @brief FCP Acknowlage Failed code (unsuccess msg) */
 #define FCP_CODE_NACK 0xFF
+/** @brief OK FCP MESSAGE  */
+#define FCP_ACK_MSG 0x00
 
-Protocol_t * init_fcp(PROC_SIGNAL RxSignal, RX_TX_FUNC TxQueue);
+Protocol_t * init_fcp(RX_TX_CODE_FUNC RxSignal, RX_TX_FUNC TxQueue);
 
-int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t * size);
+int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t *size, uint8_t *rx_buffer, uint8_t *rx_size, uint8_t * code);
 
 int32_t fcp_receive( Protocol_t * pHandle, uint8_t *Buffer, uint32_t * Size );
 
@@ -45,7 +47,10 @@ typedef struct FCP_Frame
 typedef struct FCP_Handle 
 {
   Protocol_t _super;
-  PROC_SIGNAL RxSignal;
+  uint8_t RxBuffer[FCP_MAX_PAYLOAD_SIZE];
+  uint8_t RxSize; 
+  uint8_t err_code;
+  RX_TX_CODE_FUNC RxSignal;
   RX_TX_FUNC TxQueue;
 } FCP_Handle_t;
 
@@ -61,7 +66,7 @@ FCP_Handle_t fcp_handle =
   .TxQueue = NULL  
 };
 
-Protocol_t * init_fcp(PROC_SIGNAL RxSignal, RX_TX_FUNC TxQueue)
+Protocol_t * init_fcp(RX_TX_CODE_FUNC RxSignal, RX_TX_FUNC TxQueue)
 {
   fcp_handle.RxSignal = RxSignal;
   fcp_handle.TxQueue = TxQueue;
@@ -91,9 +96,9 @@ uint8_t fcp_calc_crc( FCP_Frame_t * pFrame )
   return nCRC;
 }
 
-inline int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t *size)
+inline int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t *size, uint8_t *rx_buffer, uint8_t *rx_size, uint8_t * code)
 {
-  uint8_t crc;
+  uint8_t crc, i;
   uint32_t lsize = *size;
   FCP_Frame_t * pFrame = (FCP_Frame_t*) Buffer;
 
@@ -115,17 +120,36 @@ inline int32_t fcp_frame_parse(uint8_t *Buffer, uint32_t *size)
 
     if (crc != fcp_calc_crc(pFrame))
     {
-      return PROTOCOL_STATUS_CRC_ERROR;
+      return PROTOCOL_CODE_CRC_ERROR;
+    }
+
+    if(pFrame->Code == FCP_CODE_ACK)
+    {
+      *rx_size = pFrame->Size;
+      for(i = 0; i < pFrame->Size; i++)
+        rx_buffer[i] = pFrame->Buffer[i];
+      *code = FCP_ACK_MSG;
+    }
+    else
+    {
+      *rx_size = 0;
+      *code = pFrame->Buffer[0];
     }
 
     // TODO something with the response
     // payload = bytearray(incomming[STM.PAYLOAD_IDX:payloadLen+STM.PAYLOAD_IDX])
     if( (pFrame->Size + FCP_HEADER_SIZE + 1) < lsize)
+    {
       Buffer = &Buffer[pFrame->Size + FCP_HEADER_SIZE + 1];
+      *size -= pFrame->Size + FCP_HEADER_SIZE + 1;
+    }
     else
+    {
       Buffer = NULL;
+      *size = 0;
+    }
 
-    *size -= pFrame->Size + FCP_HEADER_SIZE + 1;
+    
 
     return PROTOCOL_STATUS_OK;
   }
@@ -141,18 +165,21 @@ int32_t fcp_receive(Protocol_t *pHandle, uint8_t *buffer, uint32_t *size)
 
   if (pBuffer && (lsize > 0))
   {
-    ret = fcp_frame_parse(pBuffer, &lsize);
+    ret = fcp_frame_parse(pBuffer, &lsize, pFcpHandle->RxBuffer, &pFcpHandle->RxSize, &pFcpHandle->err_code);
     if (!ret)
     {
       ret = PROTOCOL_STATUS_OK;
-      DiagMsg(DIAG_DEBUG,"Valid FCP MSG");
-      pFcpHandle->RxSignal();
+      DiagMsg(DIAG_DEBUG,"Valid FCP MSG (code %d)", pFcpHandle->err_code); //NB a valid msg can also be a nack...
+      pFcpHandle->RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, pFcpHandle->err_code);      
       pHandle->Diag.MSG_OK++;
     }
     else
     {
-      if(ret == PROTOCOL_STATUS_CRC_ERROR)
+      if(ret == PROTOCOL_CODE_CRC_ERROR)
+      {
+        pFcpHandle->RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, (uint32_t) PROTOCOL_CODE_CRC_ERROR);
         pHandle->Diag.CRC_ERROR++;
+      }
       
       if(ret == PROTOCOL_STATUS_INVALID_CODE)
         pHandle->Diag.UNKNOWN_MSG++;
@@ -171,8 +198,9 @@ int32_t fcp_send_async(int32_t reg, int32_t frameid, int32_t motor_select, uint8
   int32_t ret, i;
   FCP_Frame_t msg;
   int32_t crc_idx = size + 1;
+#if ( DEBUG_FCP_MSG == 1 )
   uint8_t * ptr = (uint8_t*)&msg;
-
+#endif
 
   msg.Code = (motor_select << 5);
   msg.Code |= frameid & ~(0xE0);
@@ -182,6 +210,7 @@ int32_t fcp_send_async(int32_t reg, int32_t frameid, int32_t motor_select, uint8
     msg.Buffer[i+1] = value[i];
   msg.Buffer[crc_idx] = fcp_calc_crc(&msg);
 
+#if ( DEBUG_FCP_MSG == 1 )
   for(i=0;i < msg.Size + 3 ; i++ )
   {
     printf("0x%02X ", *ptr);
@@ -189,9 +218,9 @@ int32_t fcp_send_async(int32_t reg, int32_t frameid, int32_t motor_select, uint8
   }
 
   printf("\n");
+#endif
 
-  //ret = fcp_handle.TxQueue((uint8_t*)&msg, msg.Size+1);
-  ret = 0;
+  ret = fcp_handle.TxQueue((uint8_t*)&msg, (msg.Size + 3));
 
   return ret;
 }
