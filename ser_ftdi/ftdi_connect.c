@@ -21,6 +21,8 @@ ftdi_config_t  CurrentDev;
 ftdi_config_t * pCurrentDev = NULL;
 FT_DEVICE_LIST_INFO_NODE * pdevInfo = NULL;
 
+extern int start_listener(bool ena);
+
 
 int strcicmp(char const *a, char const *b)
 {
@@ -33,7 +35,7 @@ int strcicmp(char const *a, char const *b)
 	return -1;
 }
 
-void setCurrentDev(int devid, int baud, FT_DEVICE_LIST_INFO_NODE * devInfo )
+void setCurrentDev(int32_t devid, int32_t baud, uint32_t port, FT_DEVICE_LIST_INFO_NODE * devInfo )
 {
     if ( !devInfo )
 	{
@@ -43,9 +45,9 @@ void setCurrentDev(int devid, int baud, FT_DEVICE_LIST_INFO_NODE * devInfo )
 	CurrentDev.baud = baud;
     CurrentDev.ftHandle = devInfo->ftHandle;
 	CurrentDev.pDevInfo = devInfo;
+	CurrentDev.port = port;
 	pCurrentDev = &CurrentDev;
 }
-
 
 
 int connect(int dev , int baudrate)
@@ -60,40 +62,48 @@ int connect(int dev , int baudrate)
 
 	if(pCurrentDev)
 	{
+		start_listener(false);
 		close_device();	
 	}
 
 	if( (ret = FT_Open_Atomic(dev, &pdevInfo[dev].ftHandle)) )
         return ret;
 
-	ret = (int32_t) FT_GetComPortNumber(pdevInfo[dev].ftHandle,(LPLONG)&lComPortNumber) ;
 
-	if( ret )
+	if( FT_GetComPortNumber(pdevInfo[dev].ftHandle,(LPLONG)&lComPortNumber) )
+	{
 		DiagMsg(DIAG_ERROR,"Failed to get com port number (err %d)", ret);
-	else
-		DiagMsg(DIAG_INFO, "COM%d Connected!", lComPortNumber);
+		lComPortNumber = 0;
+	}
+		
 
-	DiagMsg(DIAG_INFO, "purge %d", (int)FT_Purge(pdevInfo[dev].ftHandle, FT_PURGE_RX | FT_PURGE_TX)); // Purge both Rx and Tx buffers
+	if( (int32_t)FT_Purge(pdevInfo[dev].ftHandle, FT_PURGE_RX | FT_PURGE_TX) )
+		DiagMsg(DIAG_WARNING, "failed to purge  %d", ret);
 
-	DiagMsg(DIAG_INFO,"sentstat %d",(int)FT_Write(pdevInfo[dev].ftHandle, (uint8_t*)"tull", 4, (LPDWORD)&ret));
+	
 	// Set default baud rate.
 	if( !(ret = FT_SetBaudRate_Atomic(pdevInfo[dev].ftHandle, baudrate)) )
-        setCurrentDev(dev, baudrate, &pdevInfo[dev]);
-
-
+	{
+		setCurrentDev(dev, baudrate, lComPortNumber, &pdevInfo[dev]);
+		start_listener(true);
+	}
+        
+	else
+	{
+		FT_Close_Atomic(pdevInfo[dev].ftHandle);
+		DiagMsg(DIAG_ERROR,"Failed set baud (err %d)", ret);
+	}		
 
 	return ret;
 }
 
 int close_device(void)
 {
+	start_listener(false);
     int ret = 0;
 	if(!pCurrentDev)
 		return ret;
 
-
-	stop_queue_thread();
-	
 	return FT_Close_Atomic(pCurrentDev->ftHandle);
 }
 
@@ -116,7 +126,7 @@ FT_DEVICE_LIST_INFO_NODE * get_device_info(uint32_t * numDevs)
     return pdevInfo;
 }
 
-bool get_device(const char * sn, int * device)
+bool get_device_sn(const char * sn, int * device)
 {
 	bool ret = false;
     uint32_t numDevs;
@@ -134,6 +144,41 @@ bool get_device(const char * sn, int * device)
 				*device = i;
 				break;
 			}
+		}
+	}
+	return ret;
+}
+
+bool get_device_port(uint32_t portNum, int * device)
+{
+	bool ret = false;
+    uint32_t numDevs;
+	int32_t lport;
+	FT_STATUS ftStatus;
+
+	
+	// Create and Get the device information list.
+	FT_DEVICE_LIST_INFO_NODE * devInfo = get_device_info(&numDevs);
+	
+	if(devInfo)
+	{
+		for (int i = 0; i < numDevs; i++)
+		{
+			ftStatus = FT_GetComPortNumber_Atomic(i, devInfo[i].ftHandle, &lport);
+			if( !ftStatus )
+			{
+				if (portNum == lport) 
+				{
+					ret = true;
+					*device = i;
+					break;
+				}
+				else
+					DiagMsg(DIAG_DEBUG, "Port %d" , lport);
+				
+			}
+			else
+				DiagMsg(DIAG_WARNING, "Failed to get port number for dev %d", i);
 		}
 	}
 	return ret;

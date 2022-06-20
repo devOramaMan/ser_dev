@@ -8,8 +8,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include "protocol_common.h"
+#include "msg_handler.h"
 
-
+#define FCP_TERM_CODE 1
 typedef enum
 {
     FCP_REQ_REGISTER,
@@ -31,6 +32,7 @@ void make_fcp_req(void);
 void poll_register(void);
 void read_file(void);
 void make_sequence(void);
+int32_t response(uint8_t * buffer, uint8_t size);
 
 uint32_t add_values(uint8_t * pData)
 {
@@ -193,14 +195,19 @@ void fcp_menu(void)
 void make_fcp_req(void)
 {
   char char_choice[200];
+  Msg_Fcp_Single_t * fcp_msg;
   int32_t choice;
   int32_t input[FCP_REQ_SIZE] = {0,0,0,0};
-  uint8_t data[FCP_MAX_PAYLOAD_SIZE];
+  uint8_t fcp_msg_buffer[FCP_MAX_PAYLOAD_SIZE + 8];
+  uint8_t * data = (fcp_msg_buffer + sizeof(Msg_Fcp_Single_t) + 1);
   uint32_t data_size = 0;
   uint32_t i;
   uint32_t step = 0;
   uint32_t err = 0;
   char q = 'r';
+  uint32_t id = 0;
+
+  *data = FCP_TERM_CODE;
 
   static const char FcpReqTypeStr[FCP_REQ_SIZE][23] = {"Register:            \0", "FrameId:             \0", "Motor Select [0/1/2]:\0", "Data:                \0"};
 
@@ -259,7 +266,13 @@ void make_fcp_req(void)
         {
         case 'y':
         case 'Y':
-          fcp_send_async(input[FCP_REQ_REGISTER], input[FCP_REQ_FAMEID], input[FCP_REQ_MOTOR], data, data_size);
+          fcp_msg = (Msg_Fcp_Single_t *)&fcp_msg_buffer[1];
+          fcp_msg->frameid = input[FCP_REQ_FAMEID];
+          fcp_msg->nodeid =  input[FCP_REQ_MOTOR];
+          fcp_msg->startReg = input[FCP_REQ_REGISTER];
+          fcp_msg->transaction_id = id++;
+          fcp_msg->size = data_size + sizeof(Msg_Fcp_Single_t);
+          msg_fcp_single(response, fcp_msg_buffer);
           break;
         case 'n':
         case 'N':
@@ -330,3 +343,32 @@ void make_sequence(void)
 
 }
 
+
+int32_t response(uint8_t * buffer, uint8_t size)
+{
+  uint32_t i;
+  Msg_Base_t * msg = (Msg_Base_t*) buffer;
+  if(msg->err_code)
+  {
+    printf("Response received Nack (id %d, code %d, size %d) err_code: %d\n", msg->id, msg->code, msg->size, msg->err_code);
+  }
+  else
+  {
+    printf("Response received Ok (id %d, code %d, size %d) Data: ", msg->id, msg->code, size);
+
+    if(size < 7)
+      printf("size error");
+    else
+    {
+      uint8_t * ptr = msg->data;
+      for (i = 0; i < size-7; i++)
+      {
+        printf("0x%02X ", *ptr);
+        ptr++;
+      }
+      printf("\n");
+    }
+  }
+  
+  return EXIT_SUCCESS;
+}

@@ -4,6 +4,7 @@
 #include "ftdi_connect.h"
 #include "fcp_term.h"
 #include "util_common.h"
+#include "ftdi_atomic.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -23,10 +24,9 @@
 #include <unistd.h>
 
 
-
-
 void quick_connect(int local_baud_rate);
 bool get_term_baud_rate(int * local_baud_rate);
+FT_DEVICE_LIST_INFO_NODE * list_device(uint32_t *numDevs);
 
 
 void ftdi_menu(void)
@@ -37,9 +37,7 @@ void ftdi_menu(void)
 	int err;
 	int latency = 2, tmp;
 	uint32_t numDevs;
-	FT_DEVICE_LIST_INFO_NODE * devInfo;
-
-	bool got_list = false;
+	FT_DEVICE_LIST_INFO_NODE * devInfo = NULL;
 	CLEAR_SCREEN();
 	// FTDI Menu
 	do
@@ -76,7 +74,7 @@ void ftdi_menu(void)
 		}
 		printf("1. Quick Connect (device 0)\n");
 		printf("2. Device List\n");
-		if (got_list == true && !isRunning()) // Only display option if devices list.
+		if (!isRunning()) // Only display option if devices list.
 		{
 			printf("3. Connect Device\n");
 		}
@@ -118,34 +116,10 @@ void ftdi_menu(void)
 		case 1:
 			quick_connect(baud_rate);
 		case 2:
-			devInfo =  get_device_info(&numDevs);
-			if(!numDevs || !devInfo)
-			{
-				printf("Failed to find ftdi device(s)");
-				got_list = false;
-			}
-			else
-			{
-				got_list = true;
-				for (int i = 0; i < numDevs && i < 8; i++)
-				{
-					printf("\nDevice: %d:\n", i);
-					printf(" 	Flags:         0x%02X\n", devInfo[i].Flags);
-					printf(" 	Type:          0x%02X\n", devInfo[i].Type);
-					printf(" 	ID:            0x%02X\n", devInfo[i].ID);
-					printf(" 	Local ID:      0x%02X\n", devInfo[i].LocId);
-					printf(" 	Serial Number: %s\n", devInfo[i].SerialNumber);
-					printf(" 	Description:   %s\n", devInfo[i].Description);
-					printf(" 	ftHandle =     %p\n", devInfo[i].ftHandle);
-				}
-			}
-
+			devInfo =  list_device(&numDevs);
 			break;
 		case 3:
-			if (got_list == true) // Only display option if devices listed.
-			{
-				connect_device(&baud_rate);
-			}
+			connect_device(&baud_rate);
 			break;
 		case 4:
 			if (pCurrentDev) // Only give display if connected.
@@ -214,6 +188,38 @@ void ftdi_menu(void)
 	} while (int_choice != 99);
 }
 
+FT_DEVICE_LIST_INFO_NODE * list_device(uint32_t *numDevs)
+{
+	FT_DEVICE_LIST_INFO_NODE * devInfo = NULL;
+	devInfo =  get_device_info(numDevs);
+	int32_t lComPortNumber;
+	if(!numDevs || !devInfo)
+	{
+		printf("Failed to find ftdi device(s)");
+	}
+	else
+	{
+		for (int i = 0; i < *numDevs && i < 8; i++)
+		{
+			
+			printf("\nDevice: %d:\n", i);
+			printf(" 	Flags:         0x%02X\n", devInfo[i].Flags);
+			printf(" 	Type:          0x%02X\n", devInfo[i].Type);
+			printf(" 	ID:            0x%02X\n", devInfo[i].ID);
+			printf(" 	Local ID:      0x%02X\n", devInfo[i].LocId);
+			printf(" 	Serial Number: %s\n", devInfo[i].SerialNumber);
+			printf(" 	Description:   %s\n", devInfo[i].Description);
+			printf(" 	ftHandle =     %p\n", devInfo[i].ftHandle);
+			if(!FT_GetComPortNumber_Atomic(i, devInfo[i].ftHandle, &lComPortNumber) && lComPortNumber>-1)
+		    	printf(" 	Port:          COM%d\n", lComPortNumber);
+			else
+				printf(" 	Port:        UNKNOWN\n");
+
+		}
+	}
+	return devInfo;
+}
+
 void quick_connect(int local_baud_rate)
 {
 	uint32_t numDevs;
@@ -232,29 +238,23 @@ void quick_connect(int local_baud_rate)
 
 bool connect_device(int * local_baud_rate)
 {
-
 	char char_choice[3];
 	int int_choice = 0;
 	int err;
 	uint32_t numDevs;
-	FT_DEVICE_LIST_INFO_NODE * devInfo =  get_device_info(&numDevs);
 
-	CLEAR_SCREEN();
-	printf("Which device # (0-8)?\n\n");
-	printf("9. Return\n");
-
+	CLEAR_SCREEN();	
 	printf("\n\nConnected FTDI:");
-	for (int i = 0; i < numDevs && i < 8; i++) {
-		printf("\nDevice: %d:\n",i);
-		printf(" 	Flags:         0x%02X\n",devInfo[i].Flags);
-		printf(" 	Type:          0x%02X\n",devInfo[i].Type);
-		printf(" 	ID:            0x%02X\n",devInfo[i].ID);
-		printf(" 	Local ID:      0x%02X\n",devInfo[i].LocId);
-		printf(" 	Serial Number: %s\n",devInfo[i].SerialNumber);
-		printf(" 	Description:   %s\n",devInfo[i].Description);
-		printf(" 	ftHandle =     %p\n", devInfo[i].ftHandle);
+	if(!list_device(&numDevs))
+	{
+		printf("\n\nNo FTDI device found:");
+		sleep(1);
+		return false;		
 	}
 
+	printf("Which device # (0-x)?\n\n");
+	printf("9. Return\n");
+	
 	scanf("%s", char_choice);
 	int_choice = atoi(char_choice);
 

@@ -11,6 +11,11 @@ FT_STATUS FT_Open_Atomic(
 FT_STATUS FT_Close_Atomic(
     FT_HANDLE ftHandle);
 
+FT_STATUS FT_GetComPortNumber_Atomic(
+    int32_t deviceNumber,
+    FT_HANDLE pHandle,
+    int32_t * ComPort);
+
 FT_STATUS FT_ResetPort_Atomic(
     FT_HANDLE ftHandle);
 

@@ -2,27 +2,32 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h> 
-#if defined(_WIN32) || defined(_WIN64)
-    #include <windows.h>
-    #include <windef.h>
-    #include <winnt.h>
-    #include <winbase.h>
-#endif
+// #if defined(_WIN32) || defined(_WIN64)
+//     #include <windows.h>
+//     #include <windef.h>
+//     #include <winnt.h>
+//     #include <winbase.h>
+// #endif
+#include <unistd.h>
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <getopt.h>
-#include "protocol_common.h"
 
+#include "protocol_common.h"
 #include "ftdi_term.h"
 #include "ftdi_connect.h"
 #include "diagnostics_util.h"
 #include "atomic_queue.h"
 #include "ftdi_atomic.h"
 #include "ftdi_listener.h"
-#include <unistd.h>
+#include "util_common.h"
+
+#include "socket_com.h"
+#include "socket_term.h"
+#include "msg_handler.h"
 
 
 void print_help(void);
@@ -34,6 +39,8 @@ void print_help(void);
 #define FTDI_TERMINAL_ARG 103
 #define CONNECT_ARG 104
 #define BAUDRATE_ARG 105
+#define SOCKET_SERVER_ARG 106
+#define SOCKET_CONNECT_STR_ARG 107
 
 static const char version[] = "0.1.0";
 
@@ -51,6 +58,8 @@ const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},
                                    {"t",    no_argument ,NULL, FTDI_TERMINAL_ARG},
                                    {"c",    required_argument ,NULL, CONNECT_ARG},
                                    {"b",    required_argument ,NULL, BAUDRATE_ARG},
+                                   {"s",    no_argument ,NULL, SOCKET_SERVER_ARG},
+                                   {"sc",   required_argument ,NULL, SOCKET_SERVER_ARG},
                                    {NULL,   0,           NULL, 0}};
 
 void print_help(void)
@@ -60,23 +69,33 @@ void print_help(void)
     printf("\n");
     printf("-v [0-x] -verbose [0-x] debug print out level\n");
     printf("-ver print version\n");
-    printf("-t -term run ftdi terminal\n");
+    printf("-t / -term - run ftdi terminal\n");
     printf("-c [sn/com] - connect to device");
+    printf("-b [x] - set baudrate");
+    printf("-s - start socket server");
     printf("-h -help print help\n\n");
 }
+
+#define TOPIC_SIZE 1
+
+Topic_Type_t msg_types[TOPIC_SIZE] =
+{
+    { FCP_SINGLE_TOPIC, (void*) msg_fcp_single }
+};
+extern int testSocket(void);
 
 int main(int argc, char *argv[])
 {
     int opt;
     bool terminal = false;
+    bool socket_server = false;
     bool connected = false;
     int debug_level = 0;
     int device_num = -1;
     int baud = 1000000;
     int tmp;
     char ser_sn[30];
-    //char char_choice[3];
-
+    char connectstr[100] = "tcp://127.0.0.1:5565";
 
     setvbuf(stdout, NULL, _IONBF, 0); 
 
@@ -103,13 +122,24 @@ int main(int argc, char *argv[])
                 return 0;
             case CONNECT_ARG:
                 snprintf(ser_sn,sizeof(ser_sn),optarg);
-                if(!get_device(ser_sn, &device_num))
+                if(!get_device_sn(ser_sn, &device_num))
                     DiagMsg( DIAG_ERROR, "Failed to find: %s", ser_sn);
                 break;
             case BAUDRATE_ARG:
                 tmp = atoi(optarg);
                 if (!tmp)
                     DiagMsg( DIAG_ERROR,"Failed to get baud argument (using default %d)", baud);
+                break;
+            case SOCKET_SERVER_ARG:
+                socket_server = true;
+                break;
+            case SOCKET_CONNECT_STR_ARG:
+                socket_server = true;
+                tmp = strlen(optarg);
+                if(tmp < sizeof(connectstr))
+                    memcpy((void*)connectstr, optarg, tmp);
+                else
+                    DiagMsg(DIAG_ERROR, "Connection string too long");
                 break;
             case '?':
             default:
@@ -128,7 +158,7 @@ int main(int argc, char *argv[])
     // optind is for the extra arguments
     // which are not parsed
     for(; optind < argc; optind++)
-    {     
+    {
         DiagMsg(DIAG_ERROR,"unknown extra option: %s\n", argv[optind]);
     }
 
@@ -145,20 +175,30 @@ int main(int argc, char *argv[])
         }
     }
 
-    
+    testSocket();
+
+    if( socket_server )
+    {
+        register_topics(msg_types, TOPIC_SIZE);
+        init_socket_menu(connectstr);
+    }
 
 
     if ( terminal )
     {
-        
         Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
         register_protocol((void*)fcp, fcp_receive);
         start_queue_thread(Write_Atomic);
-        if(connected)
-            start_listener(true);  
+        // if(connected)
+        //     start_listener(true);  
         printf("\ntype any char to open menu..\n");
         getchar();
         ftdi_menu();
+
+        if(socket_server)
+            close_socket_menu();
+        start_listener(false);
+        stop_queue_thread();
         close_device();
     }
     else
@@ -171,6 +211,11 @@ int main(int argc, char *argv[])
             start_queue_thread(Write_Atomic);
             printf("\ntype any char to exit..\n");
             getchar();
+            
+            if(socket_server)
+                close_socket_menu();
+            stop_queue_thread();
+            start_listener(false);
             close_device();
         }
     }        

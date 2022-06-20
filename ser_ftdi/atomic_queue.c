@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <protocol_common.h>
+#include "config.h"
 
 #define MAX_QUEUE 100
 
@@ -32,14 +33,16 @@ typedef struct Payload
   uint8_t *data;
 } Payload_t;
 
+
+
 typedef struct Msg
 {
-  uint32_t id;
+  Msg_Base_t _base;
   uint8_t type;
   uint8_t stat;
-  uint32_t err_code;
+  uint32_t delay;
   Payload_t send;
-  Payload_t receive;
+  void * callback;
   struct Msg *next;
 } Msg_t;
 
@@ -57,7 +60,7 @@ typedef struct
 {
   Queue_Handler_t send;
   Queue_Handler_t receive;
-  uint32_t in_code;
+  uint8_t in_code;
   Payload_t in_box;
   uint32_t MsgCnt;
   uint32_t timeout;
@@ -118,40 +121,42 @@ void *send_thread(void *arg)
         retry--;
       }
 
-      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pQHandler->threadId, msg, msg->id);
+      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pQHandler->threadId, msg, msg->_base.id);
       // Todo handle send delay
       // Wait for received condition
       time_to_wait.tv_sec = time(NULL) + pAHandler->timeout;
       stat = pAHandler->sendFunc(msg->send.data, msg->send.size, &sentBytes);
       if(!stat)
       {
-        msg->err_code = 0;
+        msg->_base.err_code = 0;
+        msg->_base.size = (uint8_t)(sizeof(msg->_base.size) \
+                                  + sizeof(msg->_base.err_code) \
+                                  + sizeof(msg->_base.spare) \
+                                  + sizeof(msg->_base.id));
         if(msg->send.size != sentBytes)
           DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
         if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
         {
           msg->stat = TIMEOUT;
-          DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->id);
+          msg->_base.err_code = PROTOCOL_CODE_TIMEOUT;
+          DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->_base.id);
         }
         else
         { 
-          DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->id);
+          DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->_base.id);
           if(!pAHandler->in_code)
           {
-            if(!msg->receive.data && !msg->receive.size)
-            {
-              msg->receive.size = pAHandler->in_box.size;
-              msg->receive.data = (uint8_t *)malloc(pAHandler->in_box.size); 
-            }
-            for(i=0;i<msg->receive.size;i++)
-              msg->receive.data[i] = pAHandler->in_box.data[i];
+            msg->_base.size += (uint8_t)pAHandler->in_box.size;
+            
+            for(i=0;i<pAHandler->in_box.size;i++)
+              msg->_base.data[i] = pAHandler->in_box.data[i];
             
             msg->stat = PROTOCOL_STATUS_OK;
           }
           else
           {
             msg->stat = PROTOCOL_STATUS_NACK;
-            msg->err_code = pAHandler->in_code;
+            msg->_base.err_code = pAHandler->in_code;
           }
         }
       }
@@ -189,6 +194,7 @@ void *send_thread(void *arg)
 
 void *receive_thread(void *arg)
 {
+  int32_t ret;
   Atomic_Queue_Handler_t *pAHandler = (Atomic_Queue_Handler_t *)arg;
   Queue_Handler_t *pQHandler = (Queue_Handler_t *)&pAHandler->receive;
 
@@ -211,11 +217,33 @@ void *receive_thread(void *arg)
     if (msg)
     {
       //TODO send msg to API
-      DiagMsg(DIAG_DEBUG, "Send msg (id %d) to API", msg->id);
+      
+      if(msg->callback)
+      {
+        if(msg->stat == PROTOCOL_STATUS_OK)
+        {
+          ret = ((int32_t(*)(uint8_t*, uint8_t))msg->callback)((uint8_t*)msg, msg->_base.size + 1 );
+        }
+        else
+        {
+          if(!msg->_base.err_code)
+          {
+            //internal processing error
+            msg->_base.err_code = msg->stat;
+          }
+          ret = ((int32_t(*)(uint8_t*, uint8_t))msg->callback)((uint8_t*)msg, msg->_base.size + 1);
+        }
+          
+        
+        if(ret)
+        {
+          DiagMsg(DIAG_ERROR, "Failed to forward msg from dev to API (id %d, err code %d)", msg->_base.id, msg->_base.err_code);
+        }
+        else
+          DiagMsg(DIAG_DEBUG, "Forward msg to API from dev (id %d, err code %d)", msg->_base.id, msg->_base.err_code);
+      }
       if(msg->send.data)
         free(msg->send.data);
-      if(msg->receive.data)
-        free(msg->receive.data);
       free(msg);
     }
   }
@@ -235,8 +263,8 @@ void start_queue_thread(RET_RX_TX_FUNC sendFunc)
   stat |= pthread_attr_getschedparam(&attr, &sp);
   if (stat)
     DiagMsg(DIAG_ERROR, "send receive queue thread attrib prio failed ");
-
-  DiagMsg(DIAG_DEBUG, "thread priority %d", sp.sched_priority);
+  else
+    DiagMsg(DIAG_DEBUG, "Queue thread priority %d", sp.sched_priority);
 
   atomic_queue_handler.sendFunc = sendFunc;
   atomic_queue_handler.send.run = true;
@@ -295,7 +323,7 @@ int32_t signal_received(uint8_t * buffer, uint32_t size, uint32_t err_code)
   pthread_mutex_lock( &(atomic_queue_handler.send.lock));
   atomic_queue_handler.in_box.data = buffer;
   atomic_queue_handler.in_box.size = size;
-  atomic_queue_handler.in_code = err_code;
+  atomic_queue_handler.in_code = (uint8_t) err_code;
   pthread_cond_signal( &(atomic_queue_handler.send.dequeued) );
   pthread_mutex_unlock( &(atomic_queue_handler.send.lock) );
   return 0;
@@ -319,12 +347,13 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
     *msg = (Msg_t *)malloc(sizeof(Msg_t));
     if (*msg)
     {
-      (*msg)->id = atomic_queue_handler.transactionCnt++;
+      (*msg)->_base.id = atomic_queue_handler.transactionCnt++;
       (*msg)->next = NULL;
-      
+      (*msg)->callback = NULL;
       (*msg)->type = (uint8_t) SINGLE_MSG;
       (*msg)->stat = (uint8_t) SENDING;
-      (*msg)->err_code = 0;
+      (*msg)->_base.code = 0;
+      (*msg)->_base.err_code = 0;
       (*msg)->send.size = size;
       if(size)
       {
@@ -334,15 +363,68 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
       }
       else
         (*msg)->send.data = NULL;
-      (*msg)->receive.size = 0;
-      (*msg)->receive.data = NULL;
+      (*msg)->_base.size = 0;
       addCnt++;
     }
   }
 
   if (addCnt)
   {
-    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->id);
+    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.id);
+    pthread_cond_signal( &(atomic_queue_handler.send.enqueued) );
+  }
+  else
+  {
+    i = 0;
+  }
+
+  pthread_mutex_unlock(&(atomic_queue_handler.send.lock));
+  return addCnt;
+}
+
+int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
+{
+   int32_t i = 0;
+  int32_t addCnt = 0;
+  pthread_mutex_lock(&(atomic_queue_handler.send.lock));
+  Msg_t **msg = &(atomic_queue_handler.send.queue);
+
+  while ((*msg) && (i++ < MAX_QUEUE))
+  {
+    msg = &(*msg)->next;
+    i++;
+  }
+
+  if (i < MAX_QUEUE && !(*msg))
+  {
+    *msg = (Msg_t *)malloc(sizeof(Msg_t));
+    if (*msg)
+    {
+      (*msg)->_base.id = amsg->id;
+      (*msg)->callback = amsg->callback;
+      (*msg)->next = NULL;
+      
+      (*msg)->type = (uint8_t) SINGLE_MSG;
+      (*msg)->stat = (uint8_t) SENDING;
+      (*msg)->_base.code = amsg->code;
+      (*msg)->_base.err_code = 0;
+      (*msg)->send.size = amsg->size;
+      if(amsg->size)
+      {
+        (*msg)->send.data = (uint8_t *)malloc(amsg->size);
+        for(i=0; i<amsg->size;i++)
+          (*msg)->send.data[i] = amsg->buffer[i];
+      }
+      else
+        (*msg)->send.data = NULL;
+      (*msg)->_base.size = 0;
+      addCnt++;
+    }
+  }
+
+  if (addCnt)
+  {
+    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.id);
     pthread_cond_signal( &(atomic_queue_handler.send.enqueued) );
   }
   else

@@ -18,8 +18,9 @@ typedef struct _EVENT_HANDLE
 
 typedef struct ftdi_config
 {
-    int devid;
-    int baud;
+    int32_t devid;
+    int32_t baud;
+    uint32_t port;
     FT_HANDLE ftHandle;
     FT_DEVICE_LIST_INFO_NODE * pDevInfo;
 }ftdi_config_t;

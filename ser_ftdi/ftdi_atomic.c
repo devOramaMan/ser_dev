@@ -69,6 +69,7 @@ inline FT_STATUS FT_Open_Atomic(
   return ftStatus;
 }
 
+
 inline FT_STATUS FT_Close_Atomic(
     FT_HANDLE ftHandle)
 {
@@ -77,6 +78,29 @@ inline FT_STATUS FT_Close_Atomic(
   set_lock(&atomic_ftdi_handler.ftdi_write_mutex);
   ftStatus = FT_Close(ftHandle);
   pCurrentDev = NULL;
+  un_lock(&atomic_ftdi_handler.ftdi_read_mutex.eMutex);
+  un_lock(&atomic_ftdi_handler.ftdi_write_mutex);
+  return ftStatus;
+}
+
+inline FT_STATUS FT_GetComPortNumber_Atomic(
+    int32_t deviceNumber,
+    FT_HANDLE pHandle,
+    int32_t * ComPort)
+{
+  FT_STATUS ftStatus;
+  set_lock(&atomic_ftdi_handler.ftdi_read_mutex.eMutex);
+  set_lock(&atomic_ftdi_handler.ftdi_write_mutex);
+  if (pCurrentDev && pCurrentDev->devid == deviceNumber)
+  {
+    ftStatus = FT_GetComPortNumber(pHandle,(LPLONG)ComPort);
+  }
+  else
+  {
+    ftStatus = FT_Open(deviceNumber, &pHandle);
+    ftStatus |= FT_GetComPortNumber(pHandle,(LPLONG)ComPort);
+    FT_Close(pHandle);
+  }
   un_lock(&atomic_ftdi_handler.ftdi_read_mutex.eMutex);
   un_lock(&atomic_ftdi_handler.ftdi_write_mutex);
   return ftStatus;

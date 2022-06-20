@@ -10,11 +10,11 @@
             "request": "launch",
             "program": "${workspaceRoot}/ser_ftdi/ser_ftdi.exe",
             "args": [
-                "-c",
-				"FT4YBP6U",
+                "-s",
                 "-t",
                 "-v",
-                "4"
+                "5",
+                "-s"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

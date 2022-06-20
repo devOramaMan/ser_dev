@@ -27,6 +27,22 @@ inline float isFloat(char *str, bool *ok)
   return *ok ? val : 0.0;
 }
 
+inline int32_t getInt(char *lstr, bool *ok)
+{
+  int32_t len;
+  int32_t val;
+  int32_t ret;
+  char *str = lstr;
+
+  // loop to the first number
+  while (!(*str >= '0' && *str <= '9') && (*str != '-') && (*str != '+')) str++;
+    
+  ret = sscanf(str, "%d %n", &val, &len);
+  *ok = (ret && len == strlen(str)) ? true : false;
+
+  return *ok ? val : 0;
+}
+
 inline uint32_t setData(uint8_t datatype, uint8_t * buffer, uint8_t * val)
 {
   uint32_t size, i;

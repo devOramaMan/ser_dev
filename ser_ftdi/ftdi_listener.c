@@ -113,159 +113,175 @@ bool isRunning(void)
 
 void *threadlistener(void *arg)
 {
-    FT_STATUS ftStatus;
-    DWORD EventDWord;
-    DWORD TxBytes;
-    DWORD RxBytes = 0;
-    DWORD slen,alen;
-    uint64_t timestamp_now, timestamp_last;
-    uint8_t RxBuffer[256];
-    uint8_t *pBuffer;
-    uint8_t i;
-    Ftdi_Listener_t * pFtdiListener = (Ftdi_Listener_t*) arg;
-    PROTOCOL_CALLBACK callback;
-    int32_t ret;
-    pthread_mutex_t * rLock =  &(pFtdiListener->event->eMutex);
+  FT_STATUS ftStatus;
+  DWORD EventDWord;
+  DWORD TxBytes;
+  DWORD RxBytes = 0;
+  DWORD slen, alen, tmpLen;
+  uint64_t timestamp_now, timestamp_last;
+  uint8_t RxBuffer[256];
+  uint8_t *pBuffer, *pRxBuffer = RxBuffer;
+  uint8_t i;
+  Ftdi_Listener_t *pFtdiListener = (Ftdi_Listener_t *)arg;
+  PROTOCOL_CALLBACK callback;
+  int32_t ret;
+  pthread_mutex_t *rLock = &(pFtdiListener->event->eMutex);
+  bool unlock;
 
-    timestamp_last = time(NULL);
+  timestamp_last = time(NULL);
+  if (pCurrentDev)
+    printf("ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
+  else
+    printf("ftdi listener :: Start (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
+  EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS;
+#ifdef _WIN32
+  pFtdiListener->hEvent = CreateEvent(NULL,
+                                      true,  // manual-reset event
+                                      false, // non-signalled state
+                                      "");
+  ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle, EventDWord, pFtdiListener->hEvent);
+
+#else
+  ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle, EventDWord, (PVOID)pFtdiListener->event);
+#endif
+  if (ftStatus)
+  {
+    DiagMsg(DIAG_ERROR, "listener failed to create event");
+    ftdi_listener_handle.Running = false;
+    return NULL;
+  }
+
+  while ((!ftdi_listener_handle.Stop) && (pCurrentDev))
+  {
+    timestamp_now = time(NULL);
+    pthread_mutex_lock(rLock);
+    unlock = true;
+    // Check inside the mutex
     if (pCurrentDev)
-        printf("ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
-    else
-        printf("ftdi listener :: Start (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
-    EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS; 
-    #ifdef _WIN32 
-    pFtdiListener->hEvent = CreateEvent(NULL,
-                         true,  // manual-reset event
-                         false, // non-signalled state
-                         "");
-    ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,pFtdiListener->hEvent);
-    
-    #else
-    ftStatus = FT_SetEventNotification(pCurrentDev->ftHandle,EventDWord,(PVOID)pFtdiListener->event);
-    #endif
-    if(ftStatus)
     {
-      DiagMsg(DIAG_ERROR, "listener failed to create event");
-      ftdi_listener_handle.Running = false;
-      return NULL;
-    }
-
-    while ((!ftdi_listener_handle.Stop) && (pCurrentDev))
-    {
-        timestamp_now = time(NULL);
+      FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
+      if (!RxBytes)
+      {
+        DiagMsg(DIAG_DEBUG, "wait for rx");
+#ifndef _WIN32
+        pthread_cond_wait(&(q->eCondVar), &(eh->eMutex));
+#else
+        pthread_mutex_unlock(rLock);
+        WaitForSingleObject(pFtdiListener->hEvent, INFINITE);
         pthread_mutex_lock(rLock);
-        // Check inside the mutex
-        if (pCurrentDev)
-        {            
-            FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            if(!RxBytes)
+        ResetEvent(pFtdiListener->hEvent);
+#endif
+        DiagMsg(DIAG_DEBUG, "listener wakeup");
+      }
+      
+      if (pCurrentDev)
+      {
+        FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
+        if (RxBytes > 0)
+        {
+          tmpLen = (pRxBuffer - RxBuffer);
+          if((tmpLen + RxBytes) > sizeof(RxBuffer))
+            RxBytes = sizeof(RxBuffer) - tmpLen;
+
+          ftStatus = FT_Read(pCurrentDev->ftHandle, pRxBuffer, RxBytes, &alen);
+          unlock = false;
+          pthread_mutex_unlock(rLock);
+          if (ftStatus == FT_OK)
+          {
+            slen = alen + tmpLen;
+            DiagMsg(DIAG_RXMSG, "RX (len %d, totLen %d, pRxBuffer %p): ", alen, slen, pRxBuffer);
+            ret = 0;
+            // send to pool
+            pBuffer = RxBuffer;
+            
+            while (slen > 0)
             {
-              DiagMsg(DIAG_DEBUG, "wait for rx");
-              #ifndef _WIN32
-              pthread_cond_wait(&(q->eCondVar),&(eh->eMutex));
-              #else
-              pthread_mutex_unlock(rLock);
-              WaitForSingleObject(pFtdiListener->hEvent,INFINITE);
-              pthread_mutex_lock(rLock);
-              ResetEvent(pFtdiListener->hEvent);
-              #endif
-              DiagMsg(DIAG_DEBUG, "listener wakeup");
-              
-            }
-            FT_GetStatus(pCurrentDev->ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            if (RxBytes > 0)
-            {
-                ftStatus = FT_Read(pCurrentDev->ftHandle, RxBuffer, RxBytes, &alen);
-                pthread_mutex_unlock(rLock);
-                if (ftStatus == FT_OK)
+              callback = NULL;
+              for (i = 0; i < ftdi_listener_handle.size; i++)
+              {
+                if (hasCode(ftdi_listener_handle.ProtocolList[i].pProtocol, *pBuffer))
                 {
-                  DiagMsg(DIAG_RXMSG, "RX (len %d): ", alen);
-                  // send to pool
-                  pBuffer = RxBuffer;
-                  slen = alen;
-                  while(slen > 0)
-                  {
-                    callback = NULL;
-                    for (i = 0; i < ftdi_listener_handle.size; i++)
-                    {
-                      if(hasCode(ftdi_listener_handle.ProtocolList[i].pProtocol, *pBuffer))
-                      {
-                        callback = ftdi_listener_handle.ProtocolList[i].pCallback;
-                        break;
-                      }
-                    }
-                    if (callback)
-                    {
-                      ret = callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &slen);
-                      if(!ret)
-                      {
-                        ftdi_listener_handle.Diag.MSG_OK++;
-                      }
-                      else
-                      {
-                        if(ret == PROTOCOL_STATUS_UNDERFLOW)
-                        {
-                          //TODO Handle UNDERFLOW
-                        }
-                        else
-                        {
-                          if(ret == PROTOCOL_CODE_CRC_ERROR)
-                            ftdi_listener_handle.Diag.CRC_ERROR++;
-                          else if(ret == PROTOCOL_STATUS_INVALID_CODE)
-                            ftdi_listener_handle.Diag.UNKNOWN_MSG++;
-                          
-                          ftdi_listener_handle.Diag.RX_ERROR++;
-                        }
-                      }
-                    }
-                    else
-                    {
-                      if (slen > 0 && pBuffer)
-                      {
-                        ftdi_listener_handle.Diag.UNKNOWN_MSG++;
-                        ftdi_listener_handle.Diag.RX_ERROR++;
-                        pBuffer++;
-                        slen--;
-                      }
-                    }
-                  }
+                  callback = ftdi_listener_handle.ProtocolList[i].pCallback;
+                  break;
+                }
+              }
+              if (callback)
+              {
+                ret = callback(ftdi_listener_handle.ProtocolList[i].pProtocol, pBuffer, &slen);
+                if (!ret)
+                {
+                  ftdi_listener_handle.Diag.MSG_OK++;
                 }
                 else
                 {
-                    // FT_Read Failed
-                    ftdi_listener_handle.Diag.Flag = true;
+                  if (ret == PROTOCOL_STATUS_UNDERFLOW)
+                  {
+                    DiagMsg(DIAG_RXMSG, "Underflow (code %d, len %d)", *pBuffer, slen);
+                    pRxBuffer = pBuffer + slen;
+                    slen = 0;
+                  }
+                  else
+                  {
+                    DiagMsg(DIAG_RXMSG, "Invalid msg");
+                    if (ret == PROTOCOL_CODE_CRC_ERROR)
+                      ftdi_listener_handle.Diag.CRC_ERROR++;
+                    else if (ret == PROTOCOL_STATUS_INVALID_CODE)
+                      ftdi_listener_handle.Diag.UNKNOWN_MSG++;
+
                     ftdi_listener_handle.Diag.RX_ERROR++;
+                  }
                 }
-            }
-            else
-            {
-                pthread_mutex_unlock(rLock);
-            }
-        }
-        else
-        {
-            pthread_mutex_unlock(rLock);
-        }
+              }
+              else
+              {
+                ret = PROTOCOL_STATUS_INVALID_CODE;
+                DiagMsg(DIAG_RXMSG, "Unknown code:  %d: ", *pBuffer);
+              }
 
-        // TODO macro for sleep
-        if (ftdi_listener_handle.Diag_Ena)
-        {
-            if ((timestamp_now - timestamp_last) > DIAG_OUT_TIME)
-            {
-                print_diagnostics();
-                timestamp_last = time(NULL);
+              if(ret && ret != PROTOCOL_STATUS_UNDERFLOW)
+              {
+                
+                if (slen > 0 && pBuffer)
+                {
+                  ftdi_listener_handle.Diag.UNKNOWN_MSG++;
+                  ftdi_listener_handle.Diag.RX_ERROR++;
+                  pBuffer++;
+                  slen--;
+                }
+              }
             }
+            if(ret != PROTOCOL_STATUS_UNDERFLOW)
+              pRxBuffer = RxBuffer;
+          }
+          else
+          {
+            // FT_Read Failed
+            ftdi_listener_handle.Diag.Flag = true;
+            ftdi_listener_handle.Diag.RX_ERROR++;
+          }
         }
-
-        //Sleep(100);
+      }
     }
-    if (pCurrentDev)
-        DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
-    else
-        DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
+    if(unlock)
+      pthread_mutex_unlock(rLock);
 
-    ftdi_listener_handle.Running = false;
-    return NULL;
+    // TODO macro for sleep
+    if (ftdi_listener_handle.Diag_Ena)
+    {
+      if ((timestamp_now - timestamp_last) > DIAG_OUT_TIME)
+      {
+        print_diagnostics();
+        timestamp_last = time(NULL);
+      }
+    }
+  }
+  if (pCurrentDev)
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
+  else
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
+
+  ftdi_listener_handle.Running = false;
+  return NULL;
 }
 
 void register_protocol(void *pHandler, PROTOCOL_CALLBACK prot)
