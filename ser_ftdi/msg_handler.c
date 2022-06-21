@@ -27,8 +27,8 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
     DiagMsg(DIAG_ERROR, "msg_fcp_single Size %d", size);
     return 1;
   }
-
-  value = &buffer[FCP_SINGLE_PAYLOAD];
+  //Value address
+  value = (&buffer[FCP_SINGLE_PAYLOAD] + 1);
   crc_idx = size + 1;
 
   fcp_msg.Code = (in_msg->nodeid << 5);
