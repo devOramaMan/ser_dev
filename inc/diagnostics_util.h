@@ -25,4 +25,6 @@ extern volatile FS_CALLBACK pFSCallback;
 
 void diag_set_verbose(uint32_t val);
 
+uint32_t diag_get_verbose() __attribute__((pure));
+
 #endif /* diagnostics_util.h */

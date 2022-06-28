@@ -30,7 +30,8 @@
 int32_t isNumber(char * s, int32_t size);
 float isFloat(char *str, bool *ok);
 int32_t getInt(char *str, bool *ok);
-uint32_t setData(uint8_t datatype, uint8_t * buffer, uint8_t * val);
+uint32_t setDataType(uint8_t datatype, uint8_t * buffer, uint8_t * val);
+int checkAscii (uint8_t *array, uint32_t size);
 
 #endif 
 

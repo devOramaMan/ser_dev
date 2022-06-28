@@ -34,6 +34,11 @@ void diag_set_verbose(uint32_t val)
   verbose = val;
 }
 
+inline uint32_t diag_get_verbose()
+{
+  return verbose;
+}
+
 uint16_t addLocalTime(char* print)
 {
   uint16_t ret;

@@ -121,32 +121,32 @@ void *send_thread(void *arg)
         retry--;
       }
 
-      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pQHandler->threadId, msg, msg->_base.id);
+      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pQHandler->threadId, msg, msg->_base.keys.id);
       // Todo handle send delay
       // Wait for received condition
       time_to_wait.tv_sec = time(NULL) + pAHandler->timeout;
       stat = pAHandler->sendFunc(msg->send.data, msg->send.size, &sentBytes);
       if(!stat)
       {
-        msg->_base.err_code = 0;
-        msg->_base.size = (uint8_t)(sizeof(msg->_base.size) \
-                                  + sizeof(msg->_base.err_code) \
-                                  + sizeof(msg->_base.spare) \
-                                  + sizeof(msg->_base.id));
+        msg->_base.keys.err_code = 0;
+        msg->_base.keys.size = (uint8_t)(sizeof(msg->_base.keys.size) \
+                                  + sizeof(msg->_base.keys.err_code) \
+                                  + sizeof(msg->_base.keys.spare) \
+                                  + sizeof(msg->_base.keys.id));
         if(msg->send.size != sentBytes)
           DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
         if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
         {
           msg->stat = TIMEOUT;
-          msg->_base.err_code = PROTOCOL_CODE_TIMEOUT;
-          DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->_base.id);
+          msg->_base.keys.err_code = PROTOCOL_CODE_TIMEOUT;
+          DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->_base.keys.id);
         }
         else
         { 
-          DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->_base.id);
+          DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->_base.keys.id);
           if(!pAHandler->in_code)
           {
-            msg->_base.size += (uint8_t)pAHandler->in_box.size;
+            msg->_base.keys.size += (uint8_t)pAHandler->in_box.size;
             
             for(i=0;i<pAHandler->in_box.size;i++)
               msg->_base.data[i] = pAHandler->in_box.data[i];
@@ -156,7 +156,7 @@ void *send_thread(void *arg)
           else
           {
             msg->stat = PROTOCOL_STATUS_NACK;
-            msg->_base.err_code = pAHandler->in_code;
+            msg->_base.keys.err_code = pAHandler->in_code;
           }
         }
       }
@@ -177,7 +177,7 @@ void *send_thread(void *arg)
         while(rec_msg->next)
           rec_msg = rec_msg->next;
         rec_msg->next = free_msg;
-      }      
+      }
       else
         pAHandler->receive.queue = free_msg;
 
@@ -222,25 +222,25 @@ void *receive_thread(void *arg)
       {
         if(msg->stat == PROTOCOL_STATUS_OK)
         {
-          ret = ((int32_t(*)(uint8_t*, uint8_t))msg->callback)((uint8_t*)msg, msg->_base.size + 1 );
+          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size + 1 );
         }
         else
         {
-          if(!msg->_base.err_code)
+          if(!msg->_base.keys.err_code)
           {
             //internal processing error
-            msg->_base.err_code = msg->stat;
+            msg->_base.keys.err_code = msg->stat;
           }
-          ret = ((int32_t(*)(uint8_t*, uint8_t))msg->callback)((uint8_t*)msg, msg->_base.size + 1);
+          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size + 1);
         }
           
         
         if(ret)
         {
-          DiagMsg(DIAG_ERROR, "Failed to forward msg from dev to API (id %d, err code %d)", msg->_base.id, msg->_base.err_code);
+          DiagMsg(DIAG_ERROR, "Failed to forward msg from dev to API (id %d, err code %d)", msg->_base.keys.id, msg->_base.keys.err_code);
         }
         else
-          DiagMsg(DIAG_DEBUG, "Forward msg to API from dev (id %d, err code %d)", msg->_base.id, msg->_base.err_code);
+          DiagMsg(DIAG_DEBUG, "Forward msg to API from dev (id %d, err code %d)", msg->_base.keys.id, msg->_base.keys.err_code);
       }
       if(msg->send.data)
         free(msg->send.data);
@@ -347,13 +347,13 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
     *msg = (Msg_t *)malloc(sizeof(Msg_t));
     if (*msg)
     {
-      (*msg)->_base.id = atomic_queue_handler.transactionCnt++;
+      (*msg)->_base.keys.id = atomic_queue_handler.transactionCnt++;
       (*msg)->next = NULL;
       (*msg)->callback = NULL;
       (*msg)->type = (uint8_t) SINGLE_MSG;
       (*msg)->stat = (uint8_t) SENDING;
-      (*msg)->_base.code = 0;
-      (*msg)->_base.err_code = 0;
+      (*msg)->_base.keys.code = 0;
+      (*msg)->_base.keys.err_code = 0;
       (*msg)->send.size = size;
       if(size)
       {
@@ -363,14 +363,14 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
       }
       else
         (*msg)->send.data = NULL;
-      (*msg)->_base.size = 0;
+      (*msg)->_base.keys.size = 0;
       addCnt++;
     }
   }
 
   if (addCnt)
   {
-    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.id);
+    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.keys.id);
     pthread_cond_signal( &(atomic_queue_handler.send.enqueued) );
   }
   else
@@ -400,14 +400,14 @@ int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
     *msg = (Msg_t *)malloc(sizeof(Msg_t));
     if (*msg)
     {
-      (*msg)->_base.id = amsg->id;
+      (*msg)->_base.keys.id = amsg->id;
       (*msg)->callback = amsg->callback;
       (*msg)->next = NULL;
       
       (*msg)->type = (uint8_t) SINGLE_MSG;
       (*msg)->stat = (uint8_t) SENDING;
-      (*msg)->_base.code = amsg->code;
-      (*msg)->_base.err_code = 0;
+      (*msg)->_base.keys.code = amsg->code;
+      (*msg)->_base.keys.err_code = 0;
       (*msg)->send.size = amsg->size;
       if(amsg->size)
       {
@@ -417,14 +417,14 @@ int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
       }
       else
         (*msg)->send.data = NULL;
-      (*msg)->_base.size = 0;
+      (*msg)->_base.keys.size = 0;
       addCnt++;
     }
   }
 
   if (addCnt)
   {
-    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.id);
+    DiagMsg(DIAG_DEBUG, "Msg enqueue msg %p id %d", *msg, (*msg)->_base.keys.id);
     pthread_cond_signal( &(atomic_queue_handler.send.enqueued) );
   }
   else

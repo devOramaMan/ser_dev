@@ -43,7 +43,7 @@ inline int32_t getInt(char *lstr, bool *ok)
   return *ok ? val : 0;
 }
 
-inline uint32_t setData(uint8_t datatype, uint8_t * buffer, uint8_t * val)
+inline uint32_t setDataType(uint8_t datatype, uint8_t * buffer, uint8_t * val)
 {
   uint32_t size, i;
   uint8_t *lval = val;
@@ -69,3 +69,12 @@ inline uint32_t setData(uint8_t datatype, uint8_t * buffer, uint8_t * val)
     *buffer++ = *lval++;
   return size;
 }
+
+inline int checkAscii (uint8_t *array, uint32_t size)
+{
+    for (int i=0; i<size; i++) {
+        if (array[i] > 127) return 1;
+    }
+    return 0;
+}
+

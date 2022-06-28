@@ -32,13 +32,19 @@ typedef struct Protocol_Diag
     bool Flag;
 }Protocol_Diag_t;
 
-typedef struct Msg_Base
+typedef struct Msg_Keys
 {
   uint8_t code;
   uint8_t size;
   uint8_t err_code;
   uint8_t spare;
-  uint32_t id;  
+  uint32_t id;
+}Msg_Keys_t;
+
+
+typedef struct Msg_Base
+{
+  Msg_Keys_t keys;
   uint8_t data[128];
 }Msg_Base_t;
 
@@ -76,6 +82,14 @@ static const char dataTypeStr[DATA_TYPE_SIZE][14] =
   "",
 };
 
+#define FCP_SINGLE_TOPIC     10
+#define FCP_MULTIPLE_TOPIC   11
+#define FCP_FILE_READ_TOPIC  12
+#define FCP_FILE_WRITE_TOPIC 13
+
+#define READ_FILE_RECORD_TOPIC  20
+#define WRITE_FILE_RECORD_TOPIC 21
+
 typedef int32_t (*PROTOCOL_CALLBACK)( Protocol_t * pHandle, uint8_t * buffer, uint32_t * size );
 
 typedef struct Protocol
@@ -84,6 +98,8 @@ typedef struct Protocol
     PROTOCOL_CALLBACK pCallback;
 }Protocol_Handle_t;
 
-
-
+#if defined(__GNUC__) || defined(__clang__)
+#define __weak __attribute__((weak)) 
 #endif 
+
+#endif

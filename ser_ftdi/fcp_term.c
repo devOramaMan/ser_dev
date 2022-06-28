@@ -29,10 +29,11 @@ typedef enum
 
 
 void make_fcp_req(void);
+void make_read_req(void);
 void poll_register(void);
 void read_file(void);
 void make_sequence(void);
-int32_t response(uint8_t * buffer, uint8_t size);
+int32_t response(uint8_t * buffer, uint32_t size);
 
 uint32_t add_values(uint8_t * pData)
 {
@@ -110,7 +111,7 @@ uint32_t add_values(uint8_t * pData)
             fval = isFloat(ptr, &isTrue);
             if( isTrue )
             {
-              data_size += setData(REAL32, pData,(uint8_t*)&fval);
+              data_size += setDataType(REAL32, pData,(uint8_t*)&fval);
               q ='q';
             }
             else
@@ -122,7 +123,7 @@ uint32_t add_values(uint8_t * pData)
             {
               if (sscanf(input[step], "%d", &choice) != EOF)
               {
-                data_size += setData(datatype, pData,(uint8_t*)&choice);
+                data_size += setDataType(datatype, pData,(uint8_t*)&choice);
                 q ='q';
               }
               else
@@ -174,7 +175,7 @@ void fcp_menu(void)
             make_fcp_req();
 			break;
         case 2:
-            printf("Not Implemented \n");
+            make_read_req();
             break;
         case 3:
             printf("Not Implemented \n");
@@ -336,7 +337,37 @@ void make_fcp_req(void)
   } while (q != 'q');
 }
 
+void make_read_req(void)
+{
+  char q = 'r';
+  char char_choice[10];
+  int32_t val, i;
+  bool ok;
 
+  do 
+  {
+    for(i = 0; i < sizeof(char_choice); i++)
+    {
+      char_choice[i] = 0;
+    }
+    printf("Read File Number");
+    printf("Type input (exit:q)) > ");
+    scanf("%s", char_choice);
+    q = char_choice[0];
+    val = getInt(char_choice, &ok);
+    if( ok  && (val > 0) && (val < 255))
+    {
+      
+    }
+    else
+    {
+      printf("File must be number from 1 to 254");
+    }
+
+
+  }while(q != 'q');
+
+}
 
 void make_sequence(void)
 {
@@ -344,17 +375,17 @@ void make_sequence(void)
 }
 
 
-int32_t response(uint8_t * buffer, uint8_t size)
+int32_t response(uint8_t * buffer, uint32_t size)
 {
   uint32_t i;
   Msg_Base_t * msg = (Msg_Base_t*) buffer;
-  if(msg->err_code)
+  if(msg->keys.err_code)
   {
-    printf("Response received Nack (id %d, code %d, size %d) err_code: %d\n", msg->id, msg->code, msg->size, msg->err_code);
+    printf("Response received Nack (id %d, code %d, size %d) err_code: %d\n", msg->keys.id, msg->keys.code, msg->keys.size, msg->keys.err_code);
   }
   else
   {
-    printf("Response received Ok (id %d, code %d, size %d) Data: ", msg->id, msg->code, size);
+    printf("Response received Ok (id %d, code %d, size %d) Data: ", msg->keys.id, msg->keys.code, size);
 
     if(size < 7)
       printf("size error");

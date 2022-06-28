@@ -154,7 +154,7 @@ void *socket_com_reciv(void *arg)
     {
       DiagMsg(DIAG_DEBUG,"msg received (code: %d)", message[0]);
       topic = pSCom->topics;
-      for(i = 0; i < pSCom->topic_size; i++)
+      for(i = 0; i < pSCom->topic_size; i++, topic++)
       {
         if(message[0] == topic->code)
           ((void(*)(void*, uint8_t *))topic->pMsgHandler)((void*)sendData, &message[0]);

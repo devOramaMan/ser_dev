@@ -4,10 +4,7 @@
 
 #include <stdint.h>
 
-#define FCP_SINGLE_TOPIC     10
-#define FCP_MULTIPLE_TOPIC   11
-#define FCP_FILE_READ_TOPIC  12
-#define FCP_FILE_WRITE_TOPIC 13
+
 
 typedef struct Msg_Fcp_Single
 {
@@ -19,7 +16,11 @@ typedef struct Msg_Fcp_Single
 } Msg_Fcp_Single_t;
 
 
+
+
 uint32_t msg_fcp_single(void * pCallback, uint8_t * buffer);
+
+uint32_t msg_fcp_read_file(void * pCallback, uint8_t * buffer);
 
 
 #endif

@@ -3,6 +3,7 @@
 #include "diagnostics_util.h"
 #include "fcp_frame_protocol.h"
 #include "atomic_queue.h"
+#include "file_handler.h"
 #include <stdio.h>
 #include <config.h>
 
@@ -35,7 +36,7 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
   fcp_msg.Code |= in_msg->frameid  & ~(0xE0);
   fcp_msg.Buffer[0] = (uint8_t)in_msg->startReg;
   fcp_msg.Size = crc_idx;
-  for (i = 0; i < size; i++)
+  for (i = 0; i < size; i++)  
     fcp_msg.Buffer[i + 1] = value[i];
   fcp_msg.Buffer[crc_idx] = fcp_calc_crc(&fcp_msg);
 
@@ -58,3 +59,18 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
 
   return ret;
 }
+
+uint32_t msg_fcp_read_file(void* pCallback, uint8_t *buffer)
+{
+  uint32_t ret;
+
+  File_Type_t * file = (File_Type_t *)&buffer[0];
+
+  ret = append_read_file( pCallback, file );
+
+  DiagMsg(DIAG_DEBUG, "Incomming read file request (id %d, ret %d)", file->transaction_id, ret);
+  
+  return ret;
+}
+
+

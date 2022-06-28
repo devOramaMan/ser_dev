@@ -1,5 +1,5 @@
-_AM_CFLAGS = $(EXTRA_CFLAGS) -I$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified
-LDADD = $(EXTRA_LDFLAGS) -L$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified/amd64/ -lftd2xx$(HOST_OS_FLAG) -lzmq
+_AM_CFLAGS = $(EXTRA_CFLAGS) -I$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified -ggdb
+LDADD = $(EXTRA_LDFLAGS) -L$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified/amd64/ -lftd2xx$(HOST_OS_FLAG) -lzmq 
 LIB = 
 
 if DEBUG
@@ -27,4 +27,5 @@ kmc_rec_protocol.c  \
 ftdi_term.c  \
 fcp_term.c  \
 msg_handler.c \
-ser_ftdi.c 
+ser_ftdi.c \
+file_handler.c

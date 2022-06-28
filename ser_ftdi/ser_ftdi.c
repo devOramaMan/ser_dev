@@ -21,6 +21,7 @@
 #include "ftdi_connect.h"
 #include "diagnostics_util.h"
 #include "atomic_queue.h"
+#include "file_handler.h"
 #include "ftdi_atomic.h"
 #include "ftdi_listener.h"
 #include "util_common.h"
@@ -76,11 +77,12 @@ void print_help(void)
     printf("-h -help print help\n\n");
 }
 
-#define TOPIC_SIZE 1
+#define TOPIC_SIZE (uint32_t)2
 
 Topic_Type_t msg_types[TOPIC_SIZE] =
 {
-    { FCP_SINGLE_TOPIC, (void*) msg_fcp_single }
+    { FCP_SINGLE_TOPIC, (void*) msg_fcp_single },
+    { READ_FILE_RECORD_TOPIC, (void*) msg_fcp_read_file  }
 };
 extern int testSocket(void);
 
@@ -189,6 +191,7 @@ int main(int argc, char *argv[])
         Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
         register_protocol((void*)fcp, fcp_receive);
         start_queue_thread(Write_Atomic);
+        start_file_thread();
         // if(connected)
         //     start_listener(true);  
         printf("\ntype any char to open menu..\n");
@@ -209,6 +212,7 @@ int main(int argc, char *argv[])
             register_protocol((void*)fcp, fcp_receive);
             start_listener(true);
             start_queue_thread(Write_Atomic);
+            start_file_thread();
             printf("\ntype any char to exit..\n");
             getchar();
             

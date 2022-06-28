@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include "diagnostics_util.h"
 #include "protocol_common.h"
+#include "util_common.h"
 
 #ifdef _WIN32
     #include "windows.h"
@@ -23,6 +24,7 @@ pthread_t threadId;
 
 bool hasCode(Protocol_t * prot, uint8_t code);
 void * threadlistener(void * arg);
+int32_t handleAscii(uint8_t * buffer, uint32_t * size);
 
 typedef struct 
 {
@@ -47,6 +49,27 @@ Ftdi_Listener_t ftdi_listener_handle =
   .Running    = false,
   .Diag       = { 0, 0 , true}
 };
+
+
+
+
+__weak int32_t handleAscii(uint8_t * buffer, uint32_t * size)
+{
+  //int32_t i;
+  //uint8_t * ch = buffer;
+  if(!checkAscii(buffer, *size))
+  {
+    if(diag_get_verbose() >= DIAG_RXMSG)
+    {
+      while(*size > 0) 
+      {
+          putchar(*buffer++);
+          *size -=1;
+      }
+    }
+  }
+  return 0;
+}
 
 bool hasCode(Protocol_t *prot, uint8_t code)
 {
@@ -130,9 +153,9 @@ void *threadlistener(void *arg)
 
   timestamp_last = time(NULL);
   if (pCurrentDev)
-    printf("ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
+    DiagMsg(DIAG_DEBUG,"ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", threadId, ftdi_listener_handle.Stop, pCurrentDev->devid);
   else
-    printf("ftdi listener :: Start (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
+    DiagMsg(DIAG_DEBUG,"ftdi listener :: Start (id: %p, l:%d)\n", threadId, ftdi_listener_handle.Stop);
   EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS;
 #ifdef _WIN32
   pFtdiListener->hEvent = CreateEvent(NULL,
@@ -222,25 +245,30 @@ void *threadlistener(void *arg)
                   }
                   else
                   {
-                    DiagMsg(DIAG_RXMSG, "Invalid msg");
-                    if (ret == PROTOCOL_CODE_CRC_ERROR)
-                      ftdi_listener_handle.Diag.CRC_ERROR++;
-                    else if (ret == PROTOCOL_STATUS_INVALID_CODE)
-                      ftdi_listener_handle.Diag.UNKNOWN_MSG++;
+                    if(handleAscii(pBuffer, &slen))
+                    {
+                      DiagMsg(DIAG_RXMSG, "Invalid msg");
+                      if (ret == PROTOCOL_CODE_CRC_ERROR)
+                        ftdi_listener_handle.Diag.CRC_ERROR++;
+                      else if (ret == PROTOCOL_STATUS_INVALID_CODE)
+                        ftdi_listener_handle.Diag.UNKNOWN_MSG++;
 
-                    ftdi_listener_handle.Diag.RX_ERROR++;
+                      ftdi_listener_handle.Diag.RX_ERROR++;
+                    }
                   }
                 }
               }
               else
               {
-                ret = PROTOCOL_STATUS_INVALID_CODE;
-                DiagMsg(DIAG_RXMSG, "Unknown code:  %d: ", *pBuffer);
+                if(handleAscii(pBuffer, &slen))
+                {
+                  ret = PROTOCOL_STATUS_INVALID_CODE;
+                  DiagMsg(DIAG_RXMSG, "Unknown code:  %d: ", *pBuffer);
+                }
               }
 
               if(ret && ret != PROTOCOL_STATUS_UNDERFLOW)
               {
-                
                 if (slen > 0 && pBuffer)
                 {
                   ftdi_listener_handle.Diag.UNKNOWN_MSG++;
