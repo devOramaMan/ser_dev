@@ -35,7 +35,7 @@ void ftdi_menu(void)
 	char char_choice[50];
 	int int_choice = 0;
 	int err;
-	int latency = 2, tmp;
+	int tmp;
 	uint32_t numDevs;
 	FT_DEVICE_LIST_INFO_NODE * devInfo = NULL;
 	CLEAR_SCREEN();
@@ -46,7 +46,6 @@ void ftdi_menu(void)
 		if (pCurrentDev)
 		{
 			devInfo = pCurrentDev->pDevInfo;
-			FT_SetLatencyTimer(pCurrentDev->ftHandle, (UCHAR)latency);
 			printf("\n");
 			printf("Connected Device: %d:\n", pCurrentDev->devid);
 			FT_GetLatencyTimer(pCurrentDev->ftHandle, (PUCHAR)&tmp);

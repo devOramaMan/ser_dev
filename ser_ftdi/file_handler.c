@@ -106,6 +106,7 @@ void *file_thread(void *arg)
       pthread_cond_wait(&(pFHandler->enqueued), &(pFHandler->lock));
 
     queue = pFHandler->pFileQueue;
+    sendData = pFHandler->fileRead + MSG_KEY_SIZE;
 
     while (queue)
     {      
@@ -251,10 +252,6 @@ void *file_thread(void *arg)
         sendMsg->err_code  = PROTOCOL_STATUS_INVALID_CODE;
       }
       
-
-      if(ret)
-        DiagMsg(DIAG_ERROR, "Failed to send file response");
-
 
       queue = queue->pNext;
       file_handler.fileCnt--;

@@ -17,11 +17,18 @@
 
 #include <stdint.h>
 
-ftdi_config_t  CurrentDev;
+ftdi_config_t  CurrentDev =
+{
+	.baud = 1000000,
+	.devid = 0,
+	.latency = 2,
+	.pDevInfo = NULL,
+};
 ftdi_config_t * pCurrentDev = NULL;
 FT_DEVICE_LIST_INFO_NODE * pdevInfo = NULL;
 
 extern int start_listener(bool ena);
+int32_t getCurrentLatency(void);
 
 
 int strcicmp(char const *a, char const *b)
@@ -33,6 +40,11 @@ int strcicmp(char const *a, char const *b)
             return d;
     }
 	return -1;
+}
+
+int32_t getCurrentLatency(void)
+{
+	return CurrentDev.latency;
 }
 
 void setCurrentDev(int32_t devid, int32_t baud, uint32_t port, FT_DEVICE_LIST_INFO_NODE * devInfo )
@@ -54,6 +66,7 @@ int connect(int dev , int baudrate)
 {
 	int32_t ret;
 	uint32_t lComPortNumber;
+	int32_t latency;
 
     if(!pdevInfo)
 	{
@@ -80,14 +93,16 @@ int connect(int dev , int baudrate)
 	if( (int32_t)FT_Purge(pdevInfo[dev].ftHandle, FT_PURGE_RX | FT_PURGE_TX) )
 		DiagMsg(DIAG_WARNING, "failed to purge  %d", ret);
 
+	latency = getCurrentLatency();
+	
+	FT_SetLatencyTimer(pdevInfo[dev].ftHandle, (UCHAR)latency);
 	
 	// Set default baud rate.
 	if( !(ret = FT_SetBaudRate_Atomic(pdevInfo[dev].ftHandle, baudrate)) )
 	{
 		setCurrentDev(dev, baudrate, lComPortNumber, &pdevInfo[dev]);
 		start_listener(true);
-	}
-        
+	}        
 	else
 	{
 		FT_Close_Atomic(pdevInfo[dev].ftHandle);

@@ -1,4 +1,4 @@
-_AM_CFLAGS = $(EXTRA_CFLAGS) -I$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified -ggdb
+_AM_CFLAGS = $(EXTRA_CFLAGS) -I$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified
 LDADD = $(EXTRA_LDFLAGS) -L$(top_srcdir)/CDM_v2.12.36.4_WHQL_Certified/amd64/ -lftd2xx$(HOST_OS_FLAG) -lzmq 
 LIB = 
 
