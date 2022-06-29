@@ -7,7 +7,7 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-#define DEBUG_FCP_MSG 0
+#define DEBUG_FCP_MSG 1
 /* Define to 1 if you have the <asm/types.h> header file. */
 /* #undef HAVE_ASM_TYPES_H */
 

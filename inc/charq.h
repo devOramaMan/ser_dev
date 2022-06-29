@@ -73,6 +73,8 @@
       c = (cq)->QUEUE[--(cq)->TAIL]; \
    } /* Endif */
 
+/* Return the current size of the queue */
+#define _CHARQ_AVAILABLE_SIZE(cq) ((cq)->MAX_SIZE - (cq)->CURRENT_SIZE)
 
 /* Return the current size of the queue */
 #define _CHARQ_SIZE(cq) ((cq)->CURRENT_SIZE)

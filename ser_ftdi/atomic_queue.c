@@ -125,14 +125,20 @@ void *send_thread(void *arg)
       // Todo handle send delay
       // Wait for received condition
       time_to_wait.tv_sec = time(NULL) + pAHandler->timeout;
+      #if (DEBUG_FCP_MSG == 1)
+      uint8_t * ptr = msg->send.data;
+      for (i = 0; i < msg->send.size; i++)
+      {
+        printf("0x%02X ", *ptr);
+        ptr++;
+      }
+      printf("\n");
+      #endif
       stat = pAHandler->sendFunc(msg->send.data, msg->send.size, &sentBytes);
       if(!stat)
       {
         msg->_base.keys.err_code = 0;
-        msg->_base.keys.size = (uint8_t)(sizeof(msg->_base.keys.size) \
-                                  + sizeof(msg->_base.keys.err_code) \
-                                  + sizeof(msg->_base.keys.spare) \
-                                  + sizeof(msg->_base.keys.id));
+        msg->_base.keys.size = MSG_KEY_SIZE;
         if(msg->send.size != sentBytes)
           DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
         if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
@@ -146,11 +152,9 @@ void *send_thread(void *arg)
           DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->_base.keys.id);
           if(!pAHandler->in_code)
           {
-            msg->_base.keys.size += (uint8_t)pAHandler->in_box.size;
-            
+            msg->_base.keys.size += pAHandler->in_box.size;
             for(i=0;i<pAHandler->in_box.size;i++)
-              msg->_base.data[i] = pAHandler->in_box.data[i];
-            
+              msg->_base.data[i] = pAHandler->in_box.data[i];            
             msg->stat = PROTOCOL_STATUS_OK;
           }
           else
@@ -222,7 +226,7 @@ void *receive_thread(void *arg)
       {
         if(msg->stat == PROTOCOL_STATUS_OK)
         {
-          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size + 1 );
+          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size);
         }
         else
         {
@@ -231,7 +235,7 @@ void *receive_thread(void *arg)
             //internal processing error
             msg->_base.keys.err_code = msg->stat;
           }
-          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size + 1);
+          ret = ((int32_t(*)(uint8_t*, uint32_t))msg->callback)((uint8_t*)msg, msg->_base.keys.size);
         }
           
         
@@ -363,7 +367,7 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
       }
       else
         (*msg)->send.data = NULL;
-      (*msg)->_base.keys.size = 0;
+      (*msg)->_base.keys.size = MSG_KEY_SIZE;
       addCnt++;
     }
   }
@@ -417,7 +421,7 @@ int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
       }
       else
         (*msg)->send.data = NULL;
-      (*msg)->_base.keys.size = 0;
+      (*msg)->_base.keys.size = MSG_KEY_SIZE;
       addCnt++;
     }
   }

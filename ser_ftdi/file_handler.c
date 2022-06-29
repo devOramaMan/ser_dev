@@ -18,15 +18,18 @@
 #define FILE_POOL_SIZE 0x10000
 #define READ_FILE_SIZE 0x7FFF
 #define MAX_FILE_QUEUE 10
-#define FCP_READ_FILE_CODE 0x05
-#define FCP_READ_FILE_DONE 0x44
+
+#define FCP_WRITE_FILE_CODE 0x04
+#define FCP_READ_FILE_CODE  0x05
+
+#define FCP_FILE_DONE 0x44
 
 
 //uint8_t FILE_READ[READ_FILE_SIZE];
 
 uint8_t FILE_WRITE[FILE_POOL_SIZE];
 
-
+#define ERROR_ARGUMENTS 0x0E
 typedef struct  File_Queue
 {
   File_Type_t File;
@@ -56,6 +59,7 @@ typedef struct
 int32_t file_response(uint8_t * buffer, uint32_t size);
 
 
+//TODO Move to project configuration
 File_Handler_t file_handler =
 {
   .enqueued = PTHREAD_COND_INITIALIZER,
@@ -80,7 +84,7 @@ void *file_thread(void *arg)
   File_Handler_t *pFHandler = (File_Handler_t *)arg;
   File_Queue_t * queue;
   uint8_t recordNumber;
-  uint8_t readBuffer[4];
+  FCP_Frame_t fcp_msg;
   uint32_t filesize;
   uint8_t receiveCode;
   Atomic_Queue_Msg_t outMsg;
@@ -93,6 +97,7 @@ void *file_thread(void *arg)
   DiagMsg(DIAG_DEBUG, "File handler started (thread Id %p)", pFHandler->threadId);
 
   outMsg.callback = (void*)file_response;
+  outMsg.buffer = (uint8_t*)&fcp_msg;
 
   pthread_mutex_lock(&pFHandler->lock);
   while (pFHandler->run)
@@ -108,159 +113,149 @@ void *file_thread(void *arg)
       receiveCode = 0;
       outMsg.code = queue->File.code;
       outMsg.id = queue->File.transaction_id;
-      code = (queue->File.nodeId << 5);
+      
       sendMsg->code = queue->File.code;
       sendMsg->id = queue->File.transaction_id;
       sendMsg->size = queue->File.size;
       recordNumber = 0;
+
+      code = (queue->File.nodeId << 0x05);
       
       DiagMsg(DIAG_DEBUG, "file handler dequeue (id: %d, size: %d)", queue->File.transaction_id, queue->File.size );
 
       if(queue->File.code == READ_FILE_RECORD_TOPIC)
       {
         code |= FCP_READ_FILE_CODE  & ~(0xE0);
-        outMsg.buffer = readBuffer;
+        
         outMsg.size = 5;
-        readBuffer[0] = code;
-        readBuffer[1] = 2; //size
-        readBuffer[2] = queue->File.fileNum;
-        sendData = pFHandler->fileRead + sizeof(sendMsg);
+        fcp_msg.Size = 2; //size
+        sendData = pFHandler->fileRead + MSG_KEY_SIZE;
       }
+      else if (queue->File.code == WRITE_FILE_RECORD_TOPIC)
+      {
+        code |= FCP_WRITE_FILE_CODE  & ~(0xE0);
+      }
+      else
+      {
+        receiveCode = 1;
+      }
+
+      fcp_msg.Buffer[0] = queue->File.fileNum;
+
+      fcp_msg.Code = code;
 
       while(!receiveCode)
       {
+        fcp_msg.Buffer[1] = recordNumber++;
         if(queue->File.code == READ_FILE_RECORD_TOPIC)
         {
-          readBuffer[3] = recordNumber++;
-          readBuffer[4] = fcp_calc_crc((FCP_Frame_t*)readBuffer);
-          append_send_msg(&outMsg);
+          fcp_msg.Buffer[2] = fcp_calc_crc(&fcp_msg);
+
+          // Send data
+          if(sendMsg->size > 0 && (filesize >= sendMsg->size))
+          {
+            ret = ((int32_t(*)(uint8_t*, uint32_t))queue->callback)((uint8_t*)sendMsg, sendMsg->size + sizeof( Msg_Keys_t ));
+            if(!ret)
+            {
+              tmp = sendData;
+              filesize = filesize - sendMsg->size;
+              sendData = pFHandler->fileRead + MSG_KEY_SIZE;
+              for(i=0;i<filesize;i++)
+              {
+                *sendData++ = *tmp++;
+              }
+            }
+            else
+            {
+              receiveCode = ret;
+              DiagMsg(DIAG_ERROR, "Failed to send file response part");
+            }
+          }
         }
+        else if( queue->File.code == WRITE_FILE_RECORD_TOPIC )
+        {
+          tmp = &fcp_msg.Buffer[2];
+          for(i = 2; (i < 128) && (filesize < queue->File.size); i++)
+          {
+             _CHARQ_DEQUEUE( &pFHandler->fileWrite, *tmp++ );
+            filesize++;
+          }
+          fcp_msg.Size = i;
+          outMsg.size = fcp_msg.Size + 3;
+          *tmp = fcp_calc_crc(&fcp_msg);
+        }
+        append_send_msg(&outMsg);
 
         time_to_wait.tv_sec = time(NULL) + pFHandler->timeout;
         if(ETIMEDOUT == pthread_cond_timedwait(&(pFHandler->dequeued), &(pFHandler->lock), &time_to_wait))
-        { 
+        {
           receiveCode = PROTOCOL_CODE_TIMEOUT;
           sendMsg->err_code = PROTOCOL_CODE_TIMEOUT;
           DiagMsg(DIAG_WARNING, "Msg timeout (ptr: %p id %d)", queue, queue->File.transaction_id);
         }
         else
         {
+          receiveCode = pFHandler->lastResponse.keys.err_code;
           if(queue->File.code == READ_FILE_RECORD_TOPIC)
           {
-            lastSize = pFHandler->lastResponse.keys.size - (uint8_t)(sizeof(Msg_Keys_t)-1);
-            if (lastSize < 0)
+            lastSize = pFHandler->lastResponse.keys.size - MSG_KEY_SIZE;
+            if ( lastSize < 0 )
             {
               DiagMsg(DIAG_ERROR, "Msg Size error");
-              receiveCode = FCP_READ_FILE_DONE;
+              receiveCode = FCP_FILE_DONE;
             }
             else
             {
               filesize += lastSize;
-              for(i = 0; i < lastSize; i++)
+              for( i = 0; i < lastSize; i++ )
                 *sendData++ = pFHandler->lastResponse.data[i];
               
-              if(lastSize < 128)
-                receiveCode = FCP_READ_FILE_DONE;
+              if( lastSize < 128 )
+                receiveCode = FCP_FILE_DONE;
             }
           }
-          receiveCode = pFHandler->lastResponse.keys.err_code;
-        }
-        // Send data
-        if(sendMsg->size > 0 && (filesize >= sendMsg->size))
-        {
-          ret = ((int32_t(*)(uint8_t*, uint32_t))queue->callback)((uint8_t*)sendMsg, sendMsg->size + sizeof( Msg_Keys_t ));
-          if(!ret)
+          else if (queue->File.code == WRITE_FILE_RECORD_TOPIC)
           {
-            tmp = sendData;
-            filesize = filesize - sendMsg->size;
-            sendData = pFHandler->fileRead + sizeof(sendMsg);
-            for(i=0;i<filesize;i++)
+            if( filesize >= queue->File.size )
             {
-              *sendData++ = *tmp++;
+              receiveCode = FCP_FILE_DONE;
             }
-          }
-          else
-          {
-            receiveCode = ret;
-            DiagMsg(DIAG_ERROR, "Failed to send file response part");
-          }
+          }          
+          
+          sendMsg->err_code = pFHandler->lastResponse.keys.err_code;
         }
       }
 
-      if(!ret)
+      if( queue->File.code == WRITE_FILE_RECORD_TOPIC )
       {
-        ret = ((int32_t(*)(uint8_t*, uint32_t))queue->callback)((uint8_t*)sendMsg, filesize + sizeof( Msg_Keys_t ));
-        DiagMsg(DIAG_DEBUG, "File sent last or whole (size %d)", filesize + sizeof( Msg_Keys_t ));
+        filesize = sizeof( Msg_Keys_t );
+        ret = ((int32_t(*)(uint8_t*, uint32_t))queue->callback)((uint8_t*)sendMsg, filesize );
+        DiagMsg(DIAG_DEBUG, "File Write response (size %d, err_code %d, ret %d)", filesize , sendMsg->err_code, ret);
       }
+      else if ( queue->File.code == READ_FILE_RECORD_TOPIC )
+      {
+        //TODO bad file complete nack code For now handle here
+        if(filesize > 0 && (sendMsg->err_code == ERROR_ARGUMENTS) )
+          sendMsg->err_code = 0;
+        if( filesize > 0 || sendMsg->err_code )
+          filesize = filesize + sizeof( Msg_Keys_t );
+        
+        if(filesize)
+        {
+          ret = ((int32_t(*)(uint8_t*, uint32_t))queue->callback)((uint8_t*)sendMsg, filesize );
+          DiagMsg(DIAG_DEBUG, "File sent last or whole (size %d, err_code %d, ret %d)", filesize, sendMsg->err_code, ret);
+        }
+      }
+      else
+      {
+        sendMsg->err_code  = PROTOCOL_STATUS_INVALID_CODE;
+      }
+      
 
       if(ret)
         DiagMsg(DIAG_ERROR, "Failed to send file response");
 
 
-      // Todo handle send delay
-      // Wait for received condition
-      
-
-      
-      //stat = pAHandler->sendFunc(msg->send.data, msg->send.size, &sentBytes);
-      //if(!stat)
-      //{
-        // queue->_base.err_code = 0;
-        // queue->_base.size = (uint8_t)(sizeof(msg->_base.size) 
-        //                           + sizeof(msg->_base.err_code) 
-        //                           + sizeof(msg->_base.spare) 
-        //                           + sizeof(msg->_base.id));
-        // if(queue->send.size != sentBytes)
-        //   DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
-        if(ETIMEDOUT == pthread_cond_timedwait(&(pFHandler->dequeued), &(pFHandler->lock), &time_to_wait))
-        {
-        //   msg->stat = TIMEOUT;
-        //   msg->_base.err_code = PROTOCOL_CODE_TIMEOUT;
-           DiagMsg(DIAG_WARNING, "Msg timeout (ptr: %p id %d)", queue, queue->File.transaction_id);
-        }
-        // else
-        // { 
-        //   DiagMsg(DIAG_DEBUG, "Msg received %p id %d", msg, msg->_base.id);
-        //   if(!pAHandler->in_code)
-        //   {
-        //     msg->_base.size += (uint8_t)pAHandler->in_box.size;
-            
-        //     for(i=0;i<pAHandler->in_box.size;i++)
-        //       msg->_base.data[i] = pAHandler->in_box.data[i];
-            
-        //     msg->stat = PROTOCOL_STATUS_OK;
-        //   }
-        //   else
-        //   {
-        //     msg->stat = PROTOCOL_STATUS_NACK;
-        //     msg->_base.err_code = pAHandler->in_code;
-        //   }
-        // }
-      // }
-      // else
-      // {
-      //   //msg->stat = SENDING_ERROR;
-      //   DiagMsg(DIAG_ERROR, "Failed to send msg (err %d)", stat);
-      // }
-      // free_msg = msg;
-      // msg = msg->next;
-      // free_msg->next = NULL;
-
-      //Enqueue receive thread handling
-      //pthread_mutex_lock(&(pFHandler->lock));
-      // if(pAHandler->receive.queue)
-      // {
-      //   rec_msg = pAHandler->receive.queue;
-      //   while(rec_msg->next)
-      //     rec_msg = rec_msg->next;
-      //   rec_msg->next = free_msg;
-      // }      
-      // else
-      //   pAHandler->receive.queue = free_msg;
-
-      //pthread_cond_signal( &(pFHandler->enqueued));
-
-      //pthread_mutex_unlock(&(pFHandler->lock));
       queue = queue->pNext;
       file_handler.fileCnt--;
     }
@@ -324,11 +319,12 @@ void stop_file_thread(void)
 
 int32_t append_read_file( void * callback, File_Type_t * file )
 {
-  //int32_t i = 0;
-  //int32_t addCnt = 0;
   pthread_mutex_lock(&(file_handler.lock));
   if (file_handler.fileCnt >= MAX_FILE_QUEUE)
+  {
+    pthread_mutex_unlock(&(file_handler.lock));
     return 1;
+  }    
 
   File_Queue_t * queueItem = file_handler.pFileQueue;
   if(!queueItem)
@@ -357,6 +353,57 @@ int32_t append_read_file( void * callback, File_Type_t * file )
   return 0;
 }
 
+
+int32_t append_write_file( void * callback, File_Type_t * file )
+{
+  int32_t i;
+  uint8_t * buffer;
+  File_Queue_t * queueItem;
+  pthread_mutex_lock(&(file_handler.lock));
+  
+  if ( (file_handler.fileCnt >= MAX_FILE_QUEUE) || (_CHARQ_AVAILABLE_SIZE(&file_handler.fileWrite) < file->size) )
+  {
+    DiagMsg(DIAG_WARNING, "Failed to append Write file request (filecnt %d, writefile size %d)", file_handler.fileCnt, _CHARQ_SIZE(&file_handler.fileWrite) );
+    pthread_mutex_unlock(&(file_handler.lock));
+    return 1;
+  }
+
+  queueItem = file_handler.pFileQueue;
+
+  buffer = (uint8_t*) file + sizeof(File_Type_t);
+
+  if(!queueItem)
+  {
+    file_handler.pFileQueue = file_queue;
+    queueItem = file_handler.pFileQueue;
+    queueItem->pNext = NULL;
+  }
+
+  while (queueItem->pNext)
+  {
+    queueItem = queueItem->pNext;
+  }
+
+  file_handler.fileCnt++;
+
+
+    
+  memcpy((void*)queueItem,  file, sizeof(File_Type_t));
+  queueItem->pNext = NULL;
+  queueItem->callback = callback;  
+
+  for( i = 0; i < queueItem->File.size; i++ )
+  {
+    _CHARQ_ENQUEUE(&file_handler.fileWrite, *buffer++);
+  }
+
+  DiagMsg(DIAG_DEBUG, "Enqueue write file (id %d, size %d)", file->transaction_id, file->size);
+
+  pthread_cond_signal( &(file_handler.enqueued) );
+
+  pthread_mutex_unlock(&(file_handler.lock));
+  return 0;
+}
 
 int32_t file_response(uint8_t * buffer, uint32_t size)
 {

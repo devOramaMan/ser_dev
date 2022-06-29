@@ -381,18 +381,18 @@ int32_t response(uint8_t * buffer, uint32_t size)
   Msg_Base_t * msg = (Msg_Base_t*) buffer;
   if(msg->keys.err_code)
   {
-    printf("Response received Nack (id %d, code %d, size %d) err_code: %d\n", msg->keys.id, msg->keys.code, msg->keys.size, msg->keys.err_code);
+    printf("Response received NACK (id %d, code %d, size %d) err_code: %d\n", msg->keys.id, msg->keys.code, msg->keys.size, msg->keys.err_code);
   }
   else
   {
-    printf("Response received Ok (id %d, code %d, size %d) Data: ", msg->keys.id, msg->keys.code, size);
+    printf("Response received OK (id %d, code %d, size %d) Data: ", msg->keys.id, msg->keys.code, size);
 
     if(size < 7)
       printf("size error");
     else
     {
       uint8_t * ptr = msg->data;
-      for (i = 0; i < size-7; i++)
+      for (i = 0; i < size-MSG_KEY_SIZE; i++)
       {
         printf("0x%02X ", *ptr);
         ptr++;

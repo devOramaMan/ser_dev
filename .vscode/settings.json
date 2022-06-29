@@ -67,7 +67,10 @@
         "system_error": "c",
         "config.h": "c",
         "__locale": "c",
-        "thread": "c"
+        "thread": "c",
+        "atomic_file.h": "c",
+        "charq.h": "c",
+        "file_handler.h": "c"
     },
     "files.exclude": {
         "**/.o": true,

@@ -60,17 +60,32 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
   return ret;
 }
 
-uint32_t msg_fcp_read_file(void* pCallback, uint8_t *buffer)
-{
-  uint32_t ret;
+// uint32_t msg_fcp_read_file(void* pCallback, uint8_t *buffer)
+// {
+//   uint32_t ret;
 
-  File_Type_t * file = (File_Type_t *)&buffer[0];
+//   File_Type_t * file = (File_Type_t *)&buffer[0];
 
-  ret = append_read_file( pCallback, file );
+//   ret = append_read_file( pCallback, file );
 
-  DiagMsg(DIAG_DEBUG, "Incomming read file request (id %d, ret %d)", file->transaction_id, ret);
+//   DiagMsg(DIAG_DEBUG, "Incomming read file request (id %d, ret %d)", file->transaction_id, ret);
   
-  return ret;
-}
+//   return ret;
+// }
+
+
+// uint32_t msg_fcp_write_file(void * pCallback, uint8_t * buffer)
+// {
+//   uint32_t ret;
+  
+//   File_Type_t * file = (File_Type_t *)&buffer[0];
+
+//   ret = append_write_file( pCallback, file );
+  
+//   DiagMsg(DIAG_DEBUG, "Incomming write file (id %d, ret %d)", file->transaction_id, ret);
+  
+//   return ret;
+//}
+
 
 

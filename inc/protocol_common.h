@@ -35,12 +35,14 @@ typedef struct Protocol_Diag
 typedef struct Msg_Keys
 {
   uint8_t code;
-  uint8_t size;
+  uint8_t range;
   uint8_t err_code;
-  uint8_t spare;
+  uint8_t type;
   uint32_t id;
+  uint32_t size;
 }Msg_Keys_t;
 
+#define MSG_KEY_SIZE sizeof(Msg_Keys_t)
 
 typedef struct Msg_Base
 {

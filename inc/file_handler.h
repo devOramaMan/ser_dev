@@ -23,6 +23,7 @@ void start_file_thread(void);
 void stop_file_thread(void);
 
 int32_t append_read_file( void * callback, File_Type_t * file );
+int32_t append_write_file( void * callback, File_Type_t * file );
 
 #endif
 

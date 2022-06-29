@@ -77,13 +77,15 @@ void print_help(void)
     printf("-h -help print help\n\n");
 }
 
-#define TOPIC_SIZE (uint32_t)2
+#define TOPIC_SIZE (uint32_t)3
 
 Topic_Type_t msg_types[TOPIC_SIZE] =
 {
     { FCP_SINGLE_TOPIC, (void*) msg_fcp_single },
-    { READ_FILE_RECORD_TOPIC, (void*) msg_fcp_read_file  }
+    { READ_FILE_RECORD_TOPIC, (void*) append_read_file },
+    { WRITE_FILE_RECORD_TOPIC, (void*) append_write_file  }
 };
+
 extern int testSocket(void);
 
 int main(int argc, char *argv[])
