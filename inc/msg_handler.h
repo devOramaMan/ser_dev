@@ -19,8 +19,7 @@ typedef struct Msg_Fcp_Single
 
 
 uint32_t msg_fcp_single(void * pCallback, uint8_t * buffer);
-
-uint32_t msg_fcp_read_file(void * pCallback, uint8_t * buffer);
+uint32_t msg_kmc_rec_subscribe(void* pCallback, uint8_t *buffer);
 
 
 #endif

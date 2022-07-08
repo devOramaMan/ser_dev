@@ -85,7 +85,7 @@ Atomic_Queue_Handler_t atomic_queue_handler =
   .in_box = {0, NULL},
   .MsgCnt = 0,
   .timeout = 3,
-  .retry = 0  
+  .retry = 0
 };
 
 void *send_thread(void *arg);
@@ -98,18 +98,18 @@ void *send_thread(void *arg)
   int32_t stat;
   uint32_t sentBytes, i;
   Atomic_Queue_Handler_t *pAHandler = (Atomic_Queue_Handler_t *)arg;
-  Queue_Handler_t *pQHandler = (Queue_Handler_t *)&pAHandler->send;
+  Queue_Handler_t *pHandler = (Queue_Handler_t *)&pAHandler->send;
   Msg_t * msg, * rec_msg, *free_msg;
 
-  DiagMsg(DIAG_DEBUG, "Send Queue handler started (thread Id %p)", pQHandler->threadId);
+  DiagMsg(DIAG_DEBUG, "Send Queue handler started (thread Id %p)", pHandler->threadId);
 
-  pthread_mutex_lock(&pQHandler->lock);
-  while (pQHandler->run)
+  pthread_mutex_lock(&pHandler->lock);
+  while (pHandler->run)
   {
-    if (!pQHandler->queue)
-      pthread_cond_wait(&(pQHandler->enqueued), &(pQHandler->lock));
+    if (!pHandler->queue)
+      pthread_cond_wait(&(pHandler->enqueued), &(pHandler->lock));
 
-    msg = pQHandler->queue;
+    msg = pHandler->queue;
 
     while (msg)
     {
@@ -121,7 +121,7 @@ void *send_thread(void *arg)
         retry--;
       }
 
-      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pQHandler->threadId, msg, msg->_base.keys.id);
+      DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pHandler->threadId, msg, msg->_base.keys.id);
       // Todo handle send delay
       // Wait for received condition
       time_to_wait.tv_sec = time(NULL) + pAHandler->timeout;
@@ -141,7 +141,7 @@ void *send_thread(void *arg)
         msg->_base.keys.size = MSG_KEY_SIZE;
         if(msg->send.size != sentBytes)
           DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
-        if(ETIMEDOUT == pthread_cond_timedwait(&(pQHandler->dequeued), &(pQHandler->lock), &time_to_wait))
+        if(ETIMEDOUT == pthread_cond_timedwait(&(pHandler->dequeued), &(pHandler->lock), &time_to_wait))
         {
           msg->stat = TIMEOUT;
           msg->_base.keys.err_code = PROTOCOL_CODE_TIMEOUT;
@@ -189,10 +189,10 @@ void *send_thread(void *arg)
 
       pthread_mutex_unlock(&(pAHandler->receive.lock));
     }
-    pQHandler->queue = NULL;
+    pHandler->queue = NULL;
   }
-  pthread_mutex_unlock(&(pQHandler->lock));
-  DiagMsg(DIAG_DEBUG, "Send thread handler done (Id %p)", pQHandler->threadId);
+  pthread_mutex_unlock(&(pHandler->lock));
+  DiagMsg(DIAG_DEBUG, "Send thread handler done (Id %p)", pHandler->threadId);
   return NULL;
 }
 
@@ -200,24 +200,24 @@ void *receive_thread(void *arg)
 {
   int32_t ret;
   Atomic_Queue_Handler_t *pAHandler = (Atomic_Queue_Handler_t *)arg;
-  Queue_Handler_t *pQHandler = (Queue_Handler_t *)&pAHandler->receive;
+  Queue_Handler_t *pHandler = (Queue_Handler_t *)&pAHandler->receive;
 
-  DiagMsg(DIAG_DEBUG, "Receive Queue handler started (thread Id %p)", pQHandler->threadId);
+  DiagMsg(DIAG_DEBUG, "Receive Queue handler started (thread Id %p)", pHandler->threadId);
 
-  while (pQHandler->run)
+  while (pHandler->run)
   {
-    pthread_mutex_lock(&pQHandler->lock);
-    if (!pQHandler->queue)
-      pthread_cond_wait(&(pQHandler->enqueued), &(pQHandler->lock));
+    pthread_mutex_lock(&pHandler->lock);
+    if (!pHandler->queue)
+      pthread_cond_wait(&(pHandler->enqueued), &(pHandler->lock));
     
     DiagMsg(DIAG_DEBUG, "Handle receive thread");
     
-    Msg_t * msg = pQHandler->queue;
+    Msg_t * msg = pHandler->queue;
     if (msg)
     {
-      pQHandler->queue = msg->next;
+      pHandler->queue = msg->next;
     }
-    pthread_mutex_unlock(&(pQHandler->lock));
+    pthread_mutex_unlock(&(pHandler->lock));
     if (msg)
     {
       //TODO send msg to API
@@ -251,7 +251,7 @@ void *receive_thread(void *arg)
       free(msg);
     }
   }
-  DiagMsg(DIAG_DEBUG, "Receive thread handler done (Id %p)", pQHandler->threadId);
+  DiagMsg(DIAG_DEBUG, "Receive thread handler done (Id %p)", pHandler->threadId);
   return NULL;
 }
 
@@ -275,7 +275,9 @@ void start_queue_thread(RET_RX_TX_FUNC sendFunc)
 
   //start Send thread
   if(!stat)
+  {
     ret = pthread_create(&(atomic_queue_handler.send.threadId), &attr, &send_thread, (void *)&atomic_queue_handler);
+  }
   else
   {
     DiagMsg(DIAG_WARNING,"start send thread without attrib");
@@ -287,6 +289,7 @@ void start_queue_thread(RET_RX_TX_FUNC sendFunc)
     DiagMsg(DIAG_ERROR, "Failed to start send queue");
     return;
   }
+  
   atomic_queue_handler.receive.run = true;
   //start Receive thread    
   if(!stat)

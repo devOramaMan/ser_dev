@@ -3,6 +3,7 @@
 #include "socket_term.h"
 #include "socket_com.h"
 #include "ftdi_connect.h"
+#include "protocol_config.h"
 #include "diagnostics_util.h"
 #include "util_common.h"
 #include "unistd.h"
@@ -207,6 +208,7 @@ void *socket_menu(void *arg)
     }
     else if(!strncasecmp(buffer, "connect", 7))
     {
+      kmc_rec_enable(&kmc_rec_handle, true);
       DiagMsg(DIAG_INFO, "Open device...");
       connected = false;
       if(dev_config)
@@ -242,7 +244,6 @@ void *socket_menu(void *arg)
       }
       if(port_config && !connected)
       {
-        
         if(get_device_port(pSTerm->iport, &dev))
         {
             if((connect(dev, pSTerm->baud)))
@@ -266,18 +267,19 @@ void *socket_menu(void *arg)
       {
         init_socket_receiver(recconnectstr);
         init_socket_sender(sendconnectstr);
+
         DiagMsg(DIAG_INFO,"Connected to %s (dev %d, baud %d, port COM%d)", pCurrentDev->pDevInfo->SerialNumber, pCurrentDev->devid, pCurrentDev->baud, pCurrentDev->port);
+        
       }
-            
     }
     else if(!strncasecmp(buffer, "close", 5))
     {
-      DiagMsg(DIAG_INFO, "Close");
-      
+      DiagMsg(DIAG_INFO, "Close Socket term");
+      //kmc_rec_unsubscribe(&kmc_rec_handle); 
+      kmc_rec_enable(&kmc_rec_handle, false);
       close_device();
       size = sprintf(buffer,"ACK");
       close_sockets();
-
     }
     else
     {

@@ -1,10 +1,11 @@
 #include "config.h"
+#include "protocol_config.h"
 #include "ftdi_term.h"
-#include "ftdi_listener.h"
 #include "ftdi_connect.h"
 #include "fcp_term.h"
 #include "util_common.h"
 #include "ftdi_atomic.h"
+#include "diagnostics_util.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -24,6 +25,7 @@
 #include <unistd.h>
 
 
+void set_loglevel(void);
 void quick_connect(int local_baud_rate);
 bool get_term_baud_rate(int * local_baud_rate);
 FT_DEVICE_LIST_INFO_NODE * list_device(uint32_t *numDevs);
@@ -73,36 +75,35 @@ void ftdi_menu(void)
 		}
 		printf("1. Quick Connect (device 0)\n");
 		printf("2. Device List\n");
-		if (!isRunning()) // Only display option if devices list.
+		if (!isRunning(&ftdi_listener)) // Only display option if devices list.
 		{
 			printf("3. Connect Device\n");
 		}
-		if (pCurrentDev && !isRunning()) // Only give display if connected.
+		if (pCurrentDev && !isRunning(&ftdi_listener)) // Only give display if connected.
 		{
 			printf("4. Close Device\n");
 		}
 		printf("5. Change/set baud-rate\n");
 		if (pCurrentDev) // Only give display if connected.
 		{
-			if (!isRunning())
+			if (!isRunning(&ftdi_listener))
 				printf("6. Start ftdi device listener\n");
 			else
 				printf("6. Stop ftdi device listener\n");
 		}
-		if (!isDiagEna())
-		{
-			printf("7. Enable ftdi device diagnostics\n");
-		}
-		else
-		{
-			printf("7. Disable ftdi device diagnostics\n");
-		}
+		
+		printf("7. Print protocol diagnostics\n");
+
+		printf("8. Clear protocol diagnostics\n");
+
+		printf("9. Set Log level\n");
+
 		if (pCurrentDev)// && (isRunning()))
 		{
-			printf("8. FCP Menu.\n");
-		}
+			printf("10. FCP Menu.\n");
+		}		
 
-		printf("9. Exit\n");
+		printf("99 Exit\n");
 
 		// Get user choice.
 		scanf("%s", char_choice);
@@ -144,35 +145,40 @@ void ftdi_menu(void)
 				printf("Failed to set baudrate (current: %d)\n" , baud_rate);
 			break;
 		case 6:
-			if (!isRunning())
+			if (!isRunning(&ftdi_listener))
 			{
 				if (pCurrentDev) // Only give display if connected.
-					start_listener(true);
+					start_listener(&ftdi_listener,pCurrentDev);
 			}
 			else
 			{
-				start_listener(false);
+				stop_listener(&ftdi_listener);
 				Sleep(1000);
 			}
 			break;
 		case 7:
-			if (!isDiagEna())
+			printf("press enter to reprint and \"q\" to return\n");
+			getchar();
+			do
 			{
-				start_diagnostics_print(true);
-			}
-			else
-			{
-				start_diagnostics_print(false);
-			}
+				protocol_diagnostics_print();
+				*char_choice = getchar();
+			} while (*char_choice != 'q');
 			break;
 		case 8:
-			fcp_menu();
+			protocol_diagnostics_clear();
 			break;
 		case 9:
+			set_loglevel();
+			break;
+		case 10:
+			fcp_menu();
+			break;
+		case 99:
 			// main_menu();
 			if (pCurrentDev) // Only give display if connected.
 			{
-				start_listener(false);
+				stop_listener(&ftdi_listener);
 				Sleep(1000);
 				close_device();
 			}
@@ -217,6 +223,16 @@ FT_DEVICE_LIST_INFO_NODE * list_device(uint32_t *numDevs)
 		}
 	}
 	return devInfo;
+}
+
+void set_loglevel(void)
+{
+	char char_choice[50];
+	printf("\n\nSet level 0-x:");
+	scanf("%s", char_choice);
+
+		// Convert string to int for switch statement.
+	diag_set_verbose(atoi(char_choice));
 }
 
 void quick_connect(int local_baud_rate)

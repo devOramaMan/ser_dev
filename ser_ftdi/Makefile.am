@@ -13,6 +13,7 @@ endif
 bin_PROGRAMS = ser_ftdi
 
 ser_ftdi_SOURCES = \
+protocol_config.c \
 diagnostics_util.c  \
 ftdi_listener.c  \
 ftdi_connect.c  \
@@ -27,5 +28,7 @@ kmc_rec_protocol.c  \
 ftdi_term.c  \
 fcp_term.c  \
 msg_handler.c \
-ser_ftdi.c \
-file_handler.c
+file_handler.c \
+protocol_handler.c \
+protocol_diag.c \
+ser_ftdi.c

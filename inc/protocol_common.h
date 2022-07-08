@@ -14,10 +14,12 @@
 
 #define PROTOCOL_STATUS_UNDERFLOW         0x06
 #define PROTOCOL_STATUS_INVALID_CODE      0x07
+#define PROTOCOL_STATUS_BUSY              0x08
 #define PROTOCOL_STATUS_NACK              0xFF
 
 #define PROTOCOL_CODE_CRC_ERROR           0x80
 #define PROTOCOL_CODE_TIMEOUT             0x81
+#define PROTOCOL_CODE_MSG_LOSS            0x82
 //#define PROTOCOL_CODE_USED_SOCKET_TIMEOUT 0x82
 
 
@@ -28,8 +30,9 @@ typedef struct Protocol_Diag
     uint32_t RX_ERROR;
     uint32_t TX_ERROR;
     uint32_t CRC_ERROR;
+    uint32_t UNDERFLOW;
     uint32_t UNKNOWN_MSG;
-    bool Flag;
+    uint32_t TIMEOUT;
 }Protocol_Diag_t;
 
 typedef struct Msg_Keys
@@ -51,11 +54,11 @@ typedef struct Msg_Base
 }Msg_Base_t;
 
 
-typedef struct protocol_base
+typedef struct Protocol_Base
 {
+  Protocol_Diag_t Diag;
   uint8_t * Code;
   uint16_t Size;
-  Protocol_Diag_t Diag;
   uint32_t MsgCnt;
 } Protocol_t;
 
@@ -84,17 +87,19 @@ static const char dataTypeStr[DATA_TYPE_SIZE][14] =
   "",
 };
 
-#define FCP_SINGLE_TOPIC     10
-#define FCP_MULTIPLE_TOPIC   11
-#define FCP_FILE_READ_TOPIC  12
-#define FCP_FILE_WRITE_TOPIC 13
+#define FCP_SINGLE_TOPIC     100
+#define FCP_MULTIPLE_TOPIC   101
 
-#define READ_FILE_RECORD_TOPIC  20
-#define WRITE_FILE_RECORD_TOPIC 21
+#define FCP_SUBSCRIBE_TOPIC  110
 
-typedef int32_t (*PROTOCOL_CALLBACK)( Protocol_t * pHandle, uint8_t * buffer, uint32_t * size );
+#define READ_FILE_RECORD_TOPIC  120
+#define WRITE_FILE_RECORD_TOPIC 121
 
-typedef struct Protocol
+#define KMC_REC_SUBSCRIBE_TOPIC  150
+
+typedef int32_t (*PROTOCOL_CALLBACK)( Protocol_t * pHandle, uint8_t ** buffer, uint32_t * size );
+
+typedef struct Protocol_Handle
 {
     Protocol_t * pProtocol;
     PROTOCOL_CALLBACK pCallback;

@@ -1,26 +1,43 @@
+/*-----------------------------------------------------------------------------
+ * Name:    ftri_listener.h
+ * Purpose: handle ftdi read worker
+ *-----------------------------------------------------------------------------
+ *
+ *----------------------------------------------------------------------------*/
 
-
-#include <stdbool.h>
-#include <stdint.h>
 
 #ifndef FTDI_LISTENER
 #define FTDI_LISTENER
+
+#include "protocol_common.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <pthread.h>
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
+typedef struct Ftdi_Listener
+{
+  Protocol_Diag_t Diag;
+  bool Stop;
+  bool Diag_Ena;
+  bool Running;
+  void* hEvent;
+  void *event;
+  void* pHandler;
+  void* callback;
+  void * pDev;
+  pthread_t threadId;
+} Ftdi_Listener_t;
 
-int start_listener(bool ena);
 
-bool isRunning(void);
+int32_t start_listener(Ftdi_Listener_t * listener, void * dev);
 
-void start_diagnostics_print(bool ena);
+void stop_listener(Ftdi_Listener_t *listener);
 
-bool isDiagEna(void);
-
-void print_diagnostics(void);
-
+bool isRunning(Ftdi_Listener_t * listener);
 
 #ifdef __cplusplus
  }

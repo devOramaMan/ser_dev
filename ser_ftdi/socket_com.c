@@ -30,6 +30,7 @@ typedef struct Socket_Term
     void* publisher;
     Topic_Type_t * topics;
     uint32_t topic_size;
+
 }Socket_Com_t;
 
 Socket_Com_t socket_com =
@@ -107,6 +108,8 @@ void init_socket_sender(const char * connectstr)
 void close_sockets(void)
 {
   socket_com.stop = true;
+
+  sleep(1);
 
   if(socket_com.publisher)
   {

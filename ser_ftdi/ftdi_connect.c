@@ -4,6 +4,7 @@
 #include "ftdi_connect.h"
 #include "ftdi_atomic.h"
 #include "diagnostics_util.h"
+#include "protocol_config.h"
 #include "atomic_queue.h"
 #include <stdio.h>
 #include <ctype.h>
@@ -27,7 +28,6 @@ ftdi_config_t  CurrentDev =
 ftdi_config_t * pCurrentDev = NULL;
 FT_DEVICE_LIST_INFO_NODE * pdevInfo = NULL;
 
-extern int start_listener(bool ena);
 int32_t getCurrentLatency(void);
 
 
@@ -75,7 +75,7 @@ int connect(int dev , int baudrate)
 
 	if(pCurrentDev)
 	{
-		start_listener(false);
+		stop_listener(&ftdi_listener);
 		close_device();	
 	}
 
@@ -101,8 +101,8 @@ int connect(int dev , int baudrate)
 	if( !(ret = FT_SetBaudRate_Atomic(pdevInfo[dev].ftHandle, baudrate)) )
 	{
 		setCurrentDev(dev, baudrate, lComPortNumber, &pdevInfo[dev]);
-		start_listener(true);
-	}        
+		start_listener(&ftdi_listener, (void*)pCurrentDev);
+	}
 	else
 	{
 		FT_Close_Atomic(pdevInfo[dev].ftHandle);
@@ -114,9 +114,9 @@ int connect(int dev , int baudrate)
 
 int close_device(void)
 {
-	start_listener(false);
-    int ret = 0;
-	if(!pCurrentDev)
+	stop_listener(&ftdi_listener);
+	int ret = 0;
+	if (!pCurrentDev)
 		return ret;
 
 	return FT_Close_Atomic(pCurrentDev->ftHandle);

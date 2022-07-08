@@ -2,6 +2,8 @@
 #include "msg_handler.h"
 #include "diagnostics_util.h"
 #include "fcp_frame_protocol.h"
+#include "kmc_rec_protocol.h"
+#include "protocol_config.h"
 #include "atomic_queue.h"
 #include "file_handler.h"
 #include <stdio.h>
@@ -60,32 +62,13 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
   return ret;
 }
 
-// uint32_t msg_fcp_read_file(void* pCallback, uint8_t *buffer)
-// {
-//   uint32_t ret;
 
-//   File_Type_t * file = (File_Type_t *)&buffer[0];
+uint32_t msg_kmc_rec_subscribe(void* pCallback, uint8_t *buffer)
+{
+  KMC_Rec_Subscribe_t * msg = (KMC_Rec_Subscribe_t*) buffer;
+  return kmc_rec_subscribe(&kmc_rec_handle, pCallback, msg);
+}
 
-//   ret = append_read_file( pCallback, file );
-
-//   DiagMsg(DIAG_DEBUG, "Incomming read file request (id %d, ret %d)", file->transaction_id, ret);
-  
-//   return ret;
-// }
-
-
-// uint32_t msg_fcp_write_file(void * pCallback, uint8_t * buffer)
-// {
-//   uint32_t ret;
-  
-//   File_Type_t * file = (File_Type_t *)&buffer[0];
-
-//   ret = append_write_file( pCallback, file );
-  
-//   DiagMsg(DIAG_DEBUG, "Incomming write file (id %d, ret %d)", file->transaction_id, ret);
-  
-//   return ret;
-//}
 
 
 

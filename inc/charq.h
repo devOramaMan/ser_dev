@@ -16,6 +16,12 @@
    (cq)->TAIL         = 0; \
    (cq)->QUEUE        = queue;
 
+/* Clear the character queue */
+#define _CHARQ_CLEAR(cq) \
+   (cq)->HEAD         = 0; \
+   (cq)->TAIL         = 0; \
+   (cq)->CURRENT_SIZE = 0;
+
 
 /* 
  * Remove a character to the TAIL of the queue 
@@ -45,6 +51,18 @@
      (cq)->CURRENT_SIZE++; \
    } /* Endif */
 
+/* 
+ * Move head and update size 
+ */
+#define _CHARQ_MOVE_HEAD(cq,h) \
+   if ( (cq)->TAIL < h ) { \
+     (cq)->CURRENT_SIZE = (cq)->MAX_SIZE - h; \
+     (cq)->CURRENT_SIZE += (cq)->TAIL; \
+   } \
+   else { \
+      (cq)->CURRENT_SIZE = (cq)->TAIL - h; \
+   } \
+   (cq)->HEAD = h
    
 /* 
  * Remove a character from the HEAD of the queue 
@@ -72,6 +90,15 @@
       } /* Endif */ \
       c = (cq)->QUEUE[--(cq)->TAIL]; \
    } /* Endif */
+
+/* 
+ * Return the size with alternate head
+ */
+#define _CHARQ_SIZE_HEAD(cq,h) \
+    ( (cq)->TAIL < h ) ? \
+     ((cq)->MAX_SIZE - h) + (cq)->TAIL \
+   : \
+      (cq)->TAIL - h;
 
 /* Return the current size of the queue */
 #define _CHARQ_AVAILABLE_SIZE(cq) ((cq)->MAX_SIZE - (cq)->CURRENT_SIZE)

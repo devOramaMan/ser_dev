@@ -17,6 +17,7 @@
 #include <getopt.h>
 
 #include "protocol_common.h"
+#include "kmc_rec_protocol.h"
 #include "ftdi_term.h"
 #include "ftdi_connect.h"
 #include "diagnostics_util.h"
@@ -25,6 +26,7 @@
 #include "ftdi_atomic.h"
 #include "ftdi_listener.h"
 #include "util_common.h"
+#include "protocol_config.h"
 
 #include "socket_com.h"
 #include "socket_term.h"
@@ -44,10 +46,6 @@ void print_help(void);
 #define SOCKET_CONNECT_STR_ARG 107
 
 static const char version[] = "0.1.0";
-
-extern Protocol_t * init_fcp(RX_TX_CODE_FUNC RxSignal, RX_TX_FUNC TxQueue);
-extern int32_t fcp_receive( Protocol_t * pHandle, uint8_t *Buffer, uint32_t * Size );
-extern void register_protocol(void *pHandler, PROTOCOL_CALLBACK prot);
 
 
 const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},
@@ -77,13 +75,14 @@ void print_help(void)
     printf("-h -help print help\n\n");
 }
 
-#define TOPIC_SIZE (uint32_t)3
+#define TOPIC_SIZE (uint32_t)4
 
 Topic_Type_t msg_types[TOPIC_SIZE] =
 {
-    { FCP_SINGLE_TOPIC, (void*) msg_fcp_single },
-    { READ_FILE_RECORD_TOPIC, (void*) append_read_file },
-    { WRITE_FILE_RECORD_TOPIC, (void*) append_write_file  }
+    { FCP_SINGLE_TOPIC,         (void*) msg_fcp_single },
+    { READ_FILE_RECORD_TOPIC,   (void*) append_read_file },
+    { WRITE_FILE_RECORD_TOPIC,  (void*) append_write_file  },
+    { KMC_REC_SUBSCRIBE_TOPIC,  (void*) msg_kmc_rec_subscribe }
 };
 
 extern int testSocket(void);
@@ -190,41 +189,41 @@ int main(int argc, char *argv[])
 
     if ( terminal )
     {
-        Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
-        register_protocol((void*)fcp, fcp_receive);
+        init_kmc_rec(&kmc_rec_handle);
         start_queue_thread(Write_Atomic);
         start_file_thread();
         // if(connected)
         //     start_listener(true);  
-        printf("\ntype any char to open menu..\n");
+        printf("\npress enter to open menu..\n");
         getchar();
         ftdi_menu();
 
         if(socket_server)
             close_socket_menu();
-        start_listener(false);
+        stop_listener(&ftdi_listener);
         stop_queue_thread();
+        stop_rec_thread(&kmc_rec_handle);
         close_device();
     }
     else
     {
         if(connected)
         {
-            Protocol_t * fcp = init_fcp(signal_received, append_send_queue);
-            register_protocol((void*)fcp, fcp_receive);
-            start_listener(true);
+            init_kmc_rec(&kmc_rec_handle);
+            start_listener(&ftdi_listener, pCurrentDev);
             start_queue_thread(Write_Atomic);
             start_file_thread();
-            printf("\ntype any char to exit..\n");
+            printf("\npress enter to exit..\n");
             getchar();
             
             if(socket_server)
                 close_socket_menu();
             stop_queue_thread();
-            start_listener(false);
+            stop_listener(&ftdi_listener);
+            stop_rec_thread(&kmc_rec_handle);
             close_device();
         }
-    }        
+    }
 
     return 0;
 }

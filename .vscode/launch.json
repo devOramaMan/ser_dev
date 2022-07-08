@@ -13,7 +13,7 @@
                 "-s",
                 "-t",
                 "-v",
-                "5",
+                "4",
                 "-s"
             ],
             "stopAtEntry": false,

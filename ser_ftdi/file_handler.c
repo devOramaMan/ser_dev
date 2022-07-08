@@ -15,12 +15,14 @@
 #include <string.h>
 
 
-#define FILE_POOL_SIZE 0x10000
-#define READ_FILE_SIZE 0x7FFF
+#define FILE_POOL_SIZE (uint32_t)0x10000
+#define READ_FILE_SIZE (int16_t)0x7FFF
 #define MAX_FILE_QUEUE 10
 
 #define FCP_WRITE_FILE_CODE 0x04
 #define FCP_READ_FILE_CODE  0x05
+
+
 
 #define FCP_FILE_DONE 0x44
 

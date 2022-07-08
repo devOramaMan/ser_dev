@@ -70,7 +70,9 @@
         "thread": "c",
         "atomic_file.h": "c",
         "charq.h": "c",
-        "file_handler.h": "c"
+        "file_handler.h": "c",
+        "protocol_config.h": "c",
+        "fcp_frame_protocol.h": "c"
     },
     "files.exclude": {
         "**/.o": true,
