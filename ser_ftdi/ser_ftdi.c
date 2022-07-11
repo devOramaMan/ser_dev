@@ -225,5 +225,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    DiagMsg(DIAG_INFO, "Exit successfully");
     return 0;
 }
+    
