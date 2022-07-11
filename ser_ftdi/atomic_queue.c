@@ -43,6 +43,7 @@ typedef struct Msg
   uint32_t delay;
   Payload_t send;
   void * callback;
+  void * handle;
   struct Msg *next;
 } Msg_t;
 
@@ -94,12 +95,13 @@ void *receive_thread(void *arg);
 void *send_thread(void *arg)
 {
   static struct timespec time_to_wait = {0, 0};
-  int32_t retry;
+  //int32_t retry;
   int32_t stat;
   uint32_t sentBytes, i;
   Atomic_Queue_Handler_t *pAHandler = (Atomic_Queue_Handler_t *)arg;
   Queue_Handler_t *pHandler = (Queue_Handler_t *)&pAHandler->send;
   Msg_t * msg, * rec_msg, *free_msg;
+  Protocol_Diag_t * pDiag;
 
   DiagMsg(DIAG_DEBUG, "Send Queue handler started (thread Id %p)", pHandler->threadId);
 
@@ -113,13 +115,15 @@ void *send_thread(void *arg)
 
     while (msg)
     {
-      retry = pAHandler->retry;
-      stat = 1;
-      while (retry > -1 && stat)
-      {
-        stat = 0;
-        retry--;
-      }
+      //retry = pAHandler->retry;
+      //stat = 1;
+
+      // TODO handle retry
+      // while (retry > -1 && stat)
+      // {
+      //   stat = 0;
+      //   retry--;
+      // }
 
       DiagMsg(DIAG_DEBUG, "Msg thread Id %p dequeue msg %p id %d", pHandler->threadId, msg, msg->_base.keys.id);
       // Todo handle send delay
@@ -141,10 +145,14 @@ void *send_thread(void *arg)
         msg->_base.keys.size = MSG_KEY_SIZE;
         if(msg->send.size != sentBytes)
           DiagMsg(DIAG_WARNING, "Inconsistend send data %d != %d", msg->send.size, sentBytes);
+
         if(ETIMEDOUT == pthread_cond_timedwait(&(pHandler->dequeued), &(pHandler->lock), &time_to_wait))
         {
           msg->stat = TIMEOUT;
           msg->_base.keys.err_code = PROTOCOL_CODE_TIMEOUT;
+          pDiag = (Protocol_Diag_t*) msg->handle;
+          if(pDiag)
+            pDiag->TIMEOUT++;
           DiagMsg(DIAG_WARNING, "Msg timeout %p id %d", msg, msg->_base.keys.id);
         }
         else
@@ -167,6 +175,9 @@ void *send_thread(void *arg)
       else
       {
         msg->stat = SENDING_ERROR;
+        pDiag = (Protocol_Diag_t*) msg->handle;
+          if(pDiag)
+            pDiag->TX_ERROR++;
         DiagMsg(DIAG_ERROR, "Failed to send msg (err %d)", stat);
       }
       free_msg = msg;
@@ -201,6 +212,7 @@ void *receive_thread(void *arg)
   int32_t ret;
   Atomic_Queue_Handler_t *pAHandler = (Atomic_Queue_Handler_t *)arg;
   Queue_Handler_t *pHandler = (Queue_Handler_t *)&pAHandler->receive;
+  Protocol_Diag_t * pDiag;
 
   DiagMsg(DIAG_DEBUG, "Receive Queue handler started (thread Id %p)", pHandler->threadId);
 
@@ -241,6 +253,12 @@ void *receive_thread(void *arg)
         
         if(ret)
         {
+          //TODO - Maby this shall be call internal error (not TX_ERROR)
+          pDiag = (Protocol_Diag_t*) msg->handle;
+          if(pDiag)
+          {
+            pDiag->TX_ERROR++;
+          }
           DiagMsg(DIAG_ERROR, "Failed to forward msg from dev to API (id %d, err code %d)", msg->_base.keys.id, msg->_base.keys.err_code);
         }
         else
@@ -416,6 +434,7 @@ int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
       (*msg)->_base.keys.code = amsg->code;
       (*msg)->_base.keys.err_code = 0;
       (*msg)->send.size = amsg->size;
+      (*msg)->handle = amsg->handle;
       if(amsg->size)
       {
         (*msg)->send.data = (uint8_t *)malloc(amsg->size);

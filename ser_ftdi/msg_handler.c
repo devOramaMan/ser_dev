@@ -57,6 +57,7 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
   out_msg.id = in_msg->transaction_id;
   out_msg.buffer = (uint8_t*)&fcp_msg;
   out_msg.size = (fcp_msg.Size + 3);
+  out_msg.handle = (void*)&fcp_handle;
   ret = append_send_msg(&out_msg);
 
   return ret;

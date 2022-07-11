@@ -4,6 +4,7 @@
 #include "file_handler.h"
 #include "diagnostics_util.h"
 #include "fcp_frame_protocol.h"
+#include "protocol_config.h"
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -100,6 +101,7 @@ void *file_thread(void *arg)
 
   outMsg.callback = (void*)file_response;
   outMsg.buffer = (uint8_t*)&fcp_msg;
+  outMsg.handle = (void*) &fcp_handle;
 
   pthread_mutex_lock(&pFHandler->lock);
   while (pFHandler->run)

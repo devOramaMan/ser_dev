@@ -306,10 +306,10 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
   uint8_t * queue;
   KMC_Code_List_t * last, * code;
   Msg_Keys_t * pOutMsg;
-  Protocol_t * pProt = (Protocol_t *)pHandle;
-  pHandle->flag = KMC_REC_BUSY;
+  Protocol_t * pProt;
 
   pthread_mutex_lock(&pHandle->lock);
+  pProt = (Protocol_t *)pHandle;
   last = pHandle->codes;
   code = pHandle->codes;
 
@@ -353,7 +353,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
         pOutMsg->size = msg->send_size + sizeof(Msg_Keys_t);
         _CHARQ_CLEAR(&code->pool);
       }
-      pHandle->flag = 0;
       pthread_mutex_unlock(&(pHandle->lock));
       return 0;
     }
@@ -364,7 +363,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
   if(msg->type != KMC_SUBSCRIBE_TYPE)
   {
     DiagMsg(DIAG_WARNING, "Not Subscribing for 0x%x", msg->rec_code);
-    pHandle->flag = 0;
     pthread_mutex_unlock(&(pHandle->lock));
     return 0;
   }
@@ -372,7 +370,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
   if(pProt->Size >= KMC_REC_MAX_CODES)
   {
     DiagMsg(DIAG_ERROR, "Kmc recorder subscription is full (size 0x%x)", pProt->Size);
-    pHandle->flag = 0;
     pthread_mutex_unlock(&(pHandle->lock));
     return 0;
   }
@@ -389,7 +386,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     if(!queue)
     {
       DiagMsg(DIAG_ERROR, "Failed to cread kmc rec pool - Memory not available");
-      pHandle->flag = 0;
       // TODO Null ptr pNext
       pthread_mutex_unlock(&(pHandle->lock));
       return 1;
@@ -401,7 +397,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     if(!code->outBuffer)
     {
       DiagMsg(DIAG_ERROR, "Failed to cread kmc rec outmsg - Memory not available");
-      pHandle->flag = 0;
       // TODO Null ptr pNext
       pthread_mutex_unlock(&(pHandle->lock));
       return 1;
@@ -425,7 +420,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     DiagMsg(DIAG_INFO, "KMC recorder started subscripiton on code 0x%X", msg->rec_code);
   }
   
-  pHandle->flag = 0;
   
   pthread_mutex_unlock(&(pHandle->lock));
   return 0;
@@ -454,7 +448,6 @@ void kmc_rec_unsubscribe(KMC_Rec_Handle_t * pHandle)
   KMC_Code_List_t * tmp;
   KMC_Code_List_t * pCode = pHandle->codes; 
   pthread_mutex_lock(&pHandle->lock);
-  pHandle->flag = KMC_REC_BUSY;
   pHandle->_super.Size = 0;
   while(pCode)
   {
@@ -465,7 +458,6 @@ void kmc_rec_unsubscribe(KMC_Rec_Handle_t * pHandle)
     free(tmp);
   }
   pHandle->codes = NULL;
-  pHandle->flag = 0;
   pthread_mutex_unlock(&pHandle->lock);
 }
 

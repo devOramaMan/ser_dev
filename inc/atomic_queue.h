@@ -8,6 +8,7 @@
 typedef struct Atomic_Queue_Msg
 {
     void * callback;
+    void * handle;
     uint8_t code;
     uint32_t id;
     uint8_t * buffer;
