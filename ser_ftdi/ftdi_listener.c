@@ -120,6 +120,7 @@ void *threadlistener(void *arg)
         pthread_cond_wait(&(q->eCondVar), &(eh->eMutex));
 #else
         pthread_mutex_unlock(rLock);
+        DiagMsg(DIAG_DEBUG, "Wait for serial");
         WaitForSingleObject(pFtdiListener->hEvent, INFINITE);
         pthread_mutex_lock(rLock);
         ResetEvent(pFtdiListener->hEvent);
@@ -136,7 +137,7 @@ void *threadlistener(void *arg)
             pRxBuffer = RxBuffer;
           tmpLen = (pRxBuffer - RxBuffer);
           DiagMsg(DIAG_RXMSG, "(RxBytes %d, tmpLen %d, pRxBuffer %p): ", RxBytes, tmpLen, pRxBuffer);
-          if ((tmpLen + RxBytes) > sizeof(RxBuffer))
+          if ((tmpLen + RxBytes) >= sizeof(RxBuffer))
             RxBytes = sizeof(RxBuffer) - tmpLen;
 
           ftStatus = FT_Read(pDev->ftHandle, pRxBuffer, RxBytes, &alen);

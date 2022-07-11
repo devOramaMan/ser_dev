@@ -63,13 +63,14 @@ void *kmc_rec_thread(void *arg)
   KMC_Code_List_t * pCode;
   int32_t i = 0, ret;
   uint8_t * sendData;
-  //Msg_Keys_t * pOutMsg;
+  Msg_Keys_t * pOutMsg;
   KMC_Rec_Handle_t *pHandler = (KMC_Rec_Handle_t *)arg;
 
   DiagMsg(DIAG_DEBUG, "kmc rec thread started (id: 0x%x)", pHandler->threadId);
   
   while (pHandler->run)
   {
+
     pthread_mutex_lock(&pHandler->lock);
     pthread_cond_wait(&(pHandler->dequeued), &(pHandler->lock));
     DiagMsg(DIAG_DEBUG, "kmc rec thread dequeued");
@@ -77,28 +78,28 @@ void *kmc_rec_thread(void *arg)
     //Todo handle busy flag
     while(pCode)
     {
-      //pOutMsg = pCode->outmsg;
-      if((pCode->tmpHead < 0) && _CHARQ_SIZE(&pCode->pool) >= pCode->subscriber.send_size)
+      pOutMsg = pCode->outmsg;
+      if(_CHARQ_SIZE(&pCode->pool) >= pCode->subscriber.send_size)
       {
-        CHARQ_STRUCT cpPool;
-        memcpy(&cpPool, &(pCode->pool), sizeof(CHARQ_STRUCT));
         sendData = (uint8_t*)(pCode->outBuffer + sizeof(Msg_Keys_t));
         for(i = 0; i < pCode->subscriber.send_size; i++ )
         {
-          _CHARQ_DEQUEUE(&cpPool,sendData[i]);
+          _CHARQ_DEQUEUE(&(pCode->pool),sendData[i]);
         }
-        pCode->tmpHead = cpPool.HEAD;
-        DiagMsg(DIAG_DEBUG, "KMC REC dequeue (msg %d, head %d)",pCode->subscriber.rec_code, pCode->tmpHead);
-        //if(pHandler->enableCallback)
-        //ret = ((int32_t(*)(uint8_t*, uint32_t))pCode->callback)((uint8_t*)pOutMsg,pOutMsg->size);
-        ret = 0;
+        DiagMsg(DIAG_DEBUG, "KMC REC dequeue (msg 0x%X)",pCode->subscriber.rec_code);
+
+        if(pHandler->enableCallback)
+        {
+          ret = ((int32_t(*)(uint8_t*, uint32_t))pCode->callback)((uint8_t*)pOutMsg,pOutMsg->size);
         
-        if(ret)
-          DiagMsg(DIAG_ERROR, "Failed to send kmc rec msg");
+          if(ret)
+            DiagMsg(DIAG_ERROR, "Failed to send kmc rec msg");
+        }
       }
       pCode = pCode->pNext;
     }
     pthread_mutex_unlock(&(pHandler->lock));
+
   }
 
   DiagMsg(DIAG_DEBUG, "kmc rec thread Done (id: 0x%x)", pHandler->threadId);
@@ -157,6 +158,7 @@ KMC_Code_List_t * kmc_frame_has_code(KMC_Rec_Handle_t * pHandle, uint8_t rec_cod
   {
     if(pCode->subscriber.rec_code == rec_code )
       break;
+    pCode = pCode->pNext;
   }
   return pCode;
 }
@@ -200,14 +202,19 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
   }
   else
   {
+    pthread_mutex_lock(&(pHandle->lock));
     pCode = kmc_frame_has_code(pHandle, pFrame->Code);
     if (!pCode)
     {
+      pthread_mutex_unlock(&(pHandle->lock));
       return PROTOCOL_STATUS_INVALID_CODE;
     }
 
     if(lsize < (pFrame->Size + KMC_TX_FRAME_SIZE + 1))
+    {
+      pthread_mutex_unlock(&(pHandle->lock));
       return PROTOCOL_STATUS_UNDERFLOW;
+    }
     
     //TODO Handle cnt
     // pFrame->cnt;
@@ -215,7 +222,8 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
 
     if( crc != kmc_frame_calc_CRC(pFrame) )
     {
-        return PROTOCOL_CODE_CRC_ERROR;
+      pthread_mutex_unlock(&(pHandle->lock));
+      return PROTOCOL_CODE_CRC_ERROR;
     }
 
     if(pCode->lastCnt >= 0 && (pCode->lastCnt != (uint8_t)(pFrame->cnt - 1)) )
@@ -230,6 +238,8 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
         *Buffer = &pBuffer[pFrame->Size + KMC_TX_FRAME_SIZE + 1];
       else
         *Buffer = NULL;
+      DiagMsg(DIAG_WARNING, "KMC rec full (code %d)", pCode->subscriber.rec_code);
+      pthread_mutex_unlock(&(pHandle->lock));
       return PROTOCOL_STATUS_OK;
     }
     else
@@ -238,17 +248,14 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
       {
         _CHARQ_ENQUEUE(&pCode->pool, payload[i]);
       }
-      if( !(pCode->tmpHead < 0) && pCode->pool.HEAD != pCode->tmpHead)
-      {
-        _CHARQ_MOVE_HEAD(&pCode->pool, pCode->tmpHead);
-        pCode->tmpHead = -1;
-      }
       if(_CHARQ_SIZE(&pCode->pool) >= pCode->subscriber.send_size)
       {
-        signal_dequeue(pHandle);
+        //signal_dequeue(pHandle);
+        pthread_cond_signal( &(pHandle->dequeued) );
       }
         
     }
+    pthread_mutex_unlock(&(pHandle->lock));
 
     if( (pFrame->Size + KMC_TX_FRAME_SIZE + 1 ) < lsize)
       *Buffer = &pBuffer[pFrame->Size + KMC_TX_FRAME_SIZE + 1];
@@ -300,11 +307,11 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
   KMC_Code_List_t * last, * code;
   Msg_Keys_t * pOutMsg;
   Protocol_t * pProt = (Protocol_t *)pHandle;
-  last = pHandle->codes;
-  code = pHandle->codes;
   pHandle->flag = KMC_REC_BUSY;
 
   pthread_mutex_lock(&pHandle->lock);
+  last = pHandle->codes;
+  code = pHandle->codes;
 
   while(code)
   {
@@ -334,11 +341,9 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
       else
       {
         DiagMsg(DIAG_INFO, "Update subscription %d", msg->rec_code);
-        code->subscriber.rec_code = msg->rec_code;
         code->subscriber.size = msg->size;
         code->subscriber.send_size = msg->send_size;
         code->subscriber.transaction_id = msg->transaction_id;
-        code->tmpHead = -1;
         pOutMsg = code->outmsg;
           pOutMsg->code = msg->code;
         pOutMsg->err_code = 0;
@@ -378,7 +383,6 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     code->callback = pCallback;
     memcpy(&code->subscriber, msg, sizeof(KMC_Rec_Subscribe_t));
     
-    code->tmpHead = -1;
     code->lastCnt = -1;
     
     queue = (uint8_t*)malloc(msg->pool_size);   
@@ -412,12 +416,13 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     pOutMsg->type = 0;
     pOutMsg->size = msg->send_size + sizeof(Msg_Keys_t); 
     code->pNext = NULL;
-    pProt->Code[pProt->Size++] = msg->rec_code;
-    DiagMsg(DIAG_INFO, "KMC recorder started subscripiton on code 0x%X", msg->rec_code);
     if(last)
       last->pNext = code;
     else
       pHandle->codes = code;
+    
+    pProt->Code[pProt->Size++] = msg->rec_code;
+    DiagMsg(DIAG_INFO, "KMC recorder started subscripiton on code 0x%X", msg->rec_code);
   }
   
   pHandle->flag = 0;
@@ -436,7 +441,6 @@ void kmc_rec_enable(KMC_Rec_Handle_t * pHandle, bool ena)
     while(code)
     {
       code->lastCnt = -1;
-      code->tmpHead = -1;
       _CHARQ_CLEAR(&code->pool);
       code = code->pNext;        
     }
