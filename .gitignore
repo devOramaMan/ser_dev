@@ -29,3 +29,4 @@ build-aux/config.guess~
 build-aux/config.sub~
 INSTALL
 Makefile.in
+__pycache__
