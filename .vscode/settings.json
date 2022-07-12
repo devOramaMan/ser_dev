@@ -72,7 +72,9 @@
         "charq.h": "c",
         "file_handler.h": "c",
         "protocol_config.h": "c",
-        "fcp_frame_protocol.h": "c"
+        "fcp_frame_protocol.h": "c",
+        "protocol_diag.h": "c",
+        "typeinfo": "c"
     },
     "files.exclude": {
         "**/.o": true,

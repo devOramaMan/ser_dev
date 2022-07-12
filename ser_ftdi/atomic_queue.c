@@ -264,6 +264,7 @@ void *receive_thread(void *arg)
         else
           DiagMsg(DIAG_DEBUG, "Forward msg to API from dev (id %d, err code %d)", msg->_base.keys.id, msg->_base.keys.err_code);
       }
+      //Todo replace with message pool instead of free and malloc / heap
       if(msg->send.data)
         free(msg->send.data);
       free(msg);
@@ -407,6 +408,8 @@ int32_t append_send_queue( uint8_t *buffer, uint32_t size )
   return addCnt;
 }
 
+
+//Todo replace with message pool instead of malloc
 int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
 {
    int32_t i = 0;

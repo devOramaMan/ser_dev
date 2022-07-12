@@ -26,5 +26,7 @@ void protocol_diagnostics_print(void);
 
 void protocol_diagnostics_clear(void);
 
+uint32_t protocol_diagnostics_dump(char * buffer, uint32_t size);
+
 #endif
 

@@ -6,6 +6,7 @@
 #include "protocol_config.h"
 #include "diagnostics_util.h"
 #include "util_common.h"
+#include "protocol_diag.h"
 #include "unistd.h"
 #include <pthread.h>
 #include <string.h>
@@ -62,7 +63,7 @@ void close_socket_menu(void)
 
 void *socket_menu(void *arg)
 {
-  char buffer [100];
+  char buffer [512];
   char recconnectstr[89];
   char sendconnectstr[89];
   uint32_t size = 0, len;
@@ -280,6 +281,11 @@ void *socket_menu(void *arg)
       close_device();
       size = sprintf(buffer,"ACK");
       close_sockets();
+    }
+    else if(!strncasecmp(buffer, "diag", 4))
+    {
+      DiagMsg(DIAG_INFO, "diagnostic request");
+      size = protocol_diagnostics_dump(buffer, sizeof(buffer));      
     }
     else
     {
