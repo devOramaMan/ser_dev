@@ -26,6 +26,7 @@ SOCKET_MENU_SN = "sn".encode('ascii')
 SOCKET_MENU_DEV = "dev".encode('ascii')
 SOCKET_MENU_BAUD = "baud".encode('ascii')
 SOCKET_MENU_CLOSE = "close".encode('ascii')
+SOCKET_MENU_DIAG =  "diag".encode('ascii')
 
 class TransAction(QObject):
     def __init__(self, key, cnt = 1) -> None:
@@ -268,26 +269,10 @@ class SocketInterface(QObject):
         self.receiveworker.addQueue(key, callback)
         return self.sendSocket.send(data)
 
-    ##
-    # @brief read register value
-    #
-    def readRegisterIf(self, nodeId, startReg, dataType, countReg):
-        log.debug("connect not implemented")
 
     ##
-    # @brief write file
+    # @brief Menu socket request
     #
-    def writeFileIf(self, nodeId, filenum, data):
-
-        log.debug("connect not implemented")
-
-    ##
-    # @brief read file
-    #
-    def readFileIf(self, nodeId, filenum):
-        log.debug("connect not implemented")
-
-
     def menuReq(self,data, timeout=3.0 ):
         data_buffer = bytes()
         self.menuSocket.send(data)
@@ -390,7 +375,7 @@ class SocketInterface(QObject):
             self.Close()
             log.error("failed to configure interface %s" % str(err))
             return False
-        #socket not ready... sleep meen while
+        #socket not ready. driver some time to connect to device... sleep meen while
         sleep(0.5)
         self.connected = True
         return True
@@ -399,8 +384,6 @@ class SocketInterface(QObject):
     # @brief Close  client
     #
     def Close(self):
-        
-
         try:
             if not self.menuSocket.closed:
                 data_buffer, flag = self.menuReq(SOCKET_MENU_CLOSE)
@@ -447,34 +430,26 @@ class SocketInterface(QObject):
         return True
 
     ##
-    # @brief set client callback for sending binary data
-    #
-    def setClientIf(self, clientif):
-        pass
+    # @brief get interface statistics
+    # @return string interface statistics
+    def getStats(self):
+        if(self.isConnect() is False):
+            log.info("device not connected")
+            return
 
-    ##
-    # @brief Update interface arguments
-    #
-    def UpdateArgs(self, **kwargs):
-        return False
+        data_buffer, flag = self.menuReq(SOCKET_MENU_DIAG)
 
-    ##
-    # @brief Disable interface
-    #
-    def disable(self):
-        return False
+        if(flag == 0):
+            log.error("Communication issues - Failed get interface statistics")
+            return ""
 
-    ##
-    # @brief Enable interface
-    #
-    def enable(self):
-        return False
+        if(data_buffer[:4] == SOCKET_MENU_NACK):
+            log.error("If Nack - Failed get interface statistics")
+            return ""
+        else:
+            return data_buffer.decode("ascii")
 
-    ##
-    # @brief read Progress
-    #
-    def getProgress(self):
-        return 0
+   
 
 
 

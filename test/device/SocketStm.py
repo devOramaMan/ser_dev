@@ -510,7 +510,7 @@ if __name__ == "__main__":
         if socket_serial.isConnect():
             print("1  - Close Connection")
             print("2  - Subscribe msg enable maintenance msg")
-            print("3  - subscribe msg enable health msg")
+            print("3  - Subscribe msg enable health msg")
             print("4  - Disable maintenance and health msg")
             print("5  - Read register")
             print("6  - Read UID")
@@ -521,6 +521,7 @@ if __name__ == "__main__":
             print("11 - Write logvar config")
             print("12 - Read logging variable file")
             print("13 - Read log file")
+            print("14 - Get interface statistics")
             print("q  - exit")
         else:
             print("1 - Connect")
@@ -633,12 +634,12 @@ if __name__ == "__main__":
             log.debug("Received val %s" % str(val))
 
         
-        if x == '11':
+        elif x == '11':
             val = socket_serial.writeRegisterIf(2, 5004, ctypes.c_uint16, [1,2,5])
             log.debug("Received val %s" % str(val))
 
         
-        if x == '12':
+        elif x == '12':
             sampleCollection = SampleDataCollection()
             log.debug("File request")
             val = socket_serial.readFileIf(2,0)
@@ -663,10 +664,13 @@ if __name__ == "__main__":
 
 
         
-        if x == '13':
+        elif x == '13':
             log.debug("File request")
             val = socket_serial.readFileIf(2,1)
             log.debug("File received")
+
+        elif x == '14':
+            print(socket_serial.getStats())
 
         if x == 'q':
             socket_serial.Close()

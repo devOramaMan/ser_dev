@@ -102,3 +102,10 @@ class RegisterInterface(object):
     #
     def getProgress(self):
         return 0
+
+    ##
+    # @brief get interface statistics
+    # @return string interface statistics
+    def getStats(self):
+        log.debug("interface statistics not implemented")
+        return ""
