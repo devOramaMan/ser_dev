@@ -68,6 +68,7 @@ typedef struct
   uint32_t transactionCnt;
   uint32_t retry;
   RET_RX_TX_FUNC sendFunc; 
+  bool sending;
 } Atomic_Queue_Handler_t;
 
 Atomic_Queue_Handler_t atomic_queue_handler =
@@ -86,7 +87,8 @@ Atomic_Queue_Handler_t atomic_queue_handler =
   .in_box = {0, NULL},
   .MsgCnt = 0,
   .timeout = 3,
-  .retry = 0
+  .retry = 0,
+  .sending = false
 };
 
 void *send_thread(void *arg);
@@ -138,6 +140,7 @@ void *send_thread(void *arg)
       }
       printf("\n");
       #endif
+      pAHandler->sending = true;
       stat = pAHandler->sendFunc(msg->send.data, msg->send.size, &sentBytes);
       if(!stat)
       {
@@ -180,6 +183,7 @@ void *send_thread(void *arg)
             pDiag->TX_ERROR++;
         DiagMsg(DIAG_ERROR, "Failed to send msg (err %d)", stat);
       }
+      pAHandler->sending = false;
       free_msg = msg;
       msg = msg->next;
       free_msg->next = NULL;
@@ -346,13 +350,18 @@ void stop_queue_thread(void)
 
 int32_t signal_received(uint8_t * buffer, uint32_t size, uint32_t err_code)
 {
+  int32_t ret = 1;
   pthread_mutex_lock( &(atomic_queue_handler.send.lock));
-  atomic_queue_handler.in_box.data = buffer;
-  atomic_queue_handler.in_box.size = size;
-  atomic_queue_handler.in_code = (uint8_t) err_code;
-  pthread_cond_signal( &(atomic_queue_handler.send.dequeued) );
+  if(atomic_queue_handler.sending)
+  {
+    atomic_queue_handler.in_box.data = buffer;
+    atomic_queue_handler.in_box.size = size;
+    atomic_queue_handler.in_code = (uint8_t) err_code;
+    pthread_cond_signal( &(atomic_queue_handler.send.dequeued) );
+    ret = 0;
+  }
   pthread_mutex_unlock( &(atomic_queue_handler.send.lock) );
-  return 0;
+  return ret;
 }
 
 int32_t append_send_queue( uint8_t *buffer, uint32_t size )
@@ -440,7 +449,7 @@ int32_t append_send_msg( const Atomic_Queue_Msg_t * amsg )
       (*msg)->handle = amsg->handle;
       if(amsg->size)
       {
-        (*msg)->send.data = (uint8_t *)malloc(amsg->size);
+        (*msg)->send.data = (uint8_t *)malloc(amsg->size + 100);
         for(i=0; i<amsg->size;i++)
           (*msg)->send.data[i] = amsg->buffer[i];
       }

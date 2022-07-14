@@ -65,6 +65,9 @@ inline int32_t fcp_frame_parse(uint8_t **Buffer, uint32_t *size, uint8_t *rx_buf
     if ((pFrame->Code != FCP_CODE_ACK) && (pFrame->Code != FCP_CODE_NACK))
       return PROTOCOL_STATUS_INVALID_CODE;
 
+    if( pFrame->Size > FCP_MAX_FRAME_SIZE )
+      return PROTOCOL_STATUS_INVALID_FRAME;
+
 
     if (lsize < pFrame->Size + FCP_HEADER_SIZE)
       return PROTOCOL_STATUS_UNDERFLOW;
@@ -83,6 +86,8 @@ inline int32_t fcp_frame_parse(uint8_t **Buffer, uint32_t *size, uint8_t *rx_buf
 
     if (crc != fcp_calc_crc(pFrame))
     {
+      *rx_size = 0;
+      *code = pFrame->Buffer[0];
       return PROTOCOL_CODE_CRC_ERROR;
     }
 
@@ -104,16 +109,12 @@ inline int32_t fcp_frame_parse(uint8_t **Buffer, uint32_t *size, uint8_t *rx_buf
     if( (pFrame->Size + FCP_HEADER_SIZE + 1) < lsize)
     {
       *Buffer = &pBuffer[pFrame->Size + FCP_HEADER_SIZE + 1];
-      *size -= pFrame->Size + FCP_HEADER_SIZE + 1;
+      *size = (lsize - (pFrame->Size + FCP_HEADER_SIZE + 1));
     }
     else
     {
-      *Buffer = NULL;
       *size = 0;
     }
-
-    
-
     return PROTOCOL_STATUS_OK;
   }
   return 0;
@@ -132,14 +133,17 @@ int32_t fcp_receive(Protocol_t *pHandle, uint8_t **buffer, uint32_t *size)
     {
       ret = PROTOCOL_STATUS_OK;
       DiagMsg(DIAG_DEBUG,"Valid FCP MSG (code %d)", pFcpHandle->err_code); //NB a valid msg can also be a nack...
-      RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, pFcpHandle->err_code);      
-      pHandle->Diag.MSG_OK++;
+      if(RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, pFcpHandle->err_code))
+        DiagMsg(DIAG_ERROR, "No FCP request for the response");
+      else
+        pHandle->Diag.MSG_OK++;
     }
     else
     {
       if(ret == PROTOCOL_CODE_CRC_ERROR)
       {
-        RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, (uint32_t) PROTOCOL_CODE_CRC_ERROR);
+        if(RxSignal(pFcpHandle->RxBuffer, (uint32_t)pFcpHandle->RxSize, (uint32_t) ret))
+          DiagMsg(DIAG_ERROR, "CRC err - No FCP request for the response");
         pHandle->Diag.CRC_ERROR++;
       }
       else if(ret == PROTOCOL_STATUS_INVALID_CODE)

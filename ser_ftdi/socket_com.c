@@ -25,11 +25,12 @@ typedef struct Socket_Term
     const char *connectstr;
     pthread_t threadId;
     volatile bool stop;
-    bool running;
+    volatile bool running;
     void* context;
     void* publisher;
     Topic_Type_t * topics;
     uint32_t topic_size;
+    int32_t timeout;
 
 }Socket_Com_t;
 
@@ -41,7 +42,8 @@ Socket_Com_t socket_com =
   .publisher = NULL,
   .context = NULL,
   .topics = NULL,
-  .topic_size = 0
+  .topic_size = 0,
+  .timeout = 1000
 };
 
 //static const uint32_t topic_size = sizeof(socket_com.topic);
@@ -91,7 +93,6 @@ void init_socket_sender(const char * connectstr)
   
   socket_com.context = zmq_ctx_new ();
 
-
   socket_com.publisher = zmq_socket (socket_com.context, ZMQ_PUB);
 
   if(zmq_bind(socket_com.publisher, connectstr))
@@ -107,9 +108,17 @@ void init_socket_sender(const char * connectstr)
 
 void close_sockets(void)
 {
+  int32_t cnt = 10;
   socket_com.stop = true;
 
-  sleep(1);
+  while(socket_com.running && cnt > 0)
+  {
+    sleep(1);
+    cnt--;  
+  }
+  if(!cnt)  
+    DiagMsg(DIAG_ERROR, "Failed to close socket com receiver");
+  
 
   if(socket_com.publisher)
   {
@@ -142,6 +151,12 @@ void *socket_com_reciv(void *arg)
     return NULL;
   }
 
+  if(zmq_setsockopt(subscriber,ZMQ_RCVTIMEO, &pSCom->timeout, sizeof(pSCom->timeout) ))
+  {
+    DiagMsg(DIAG_ERROR, "Receiver socket failed set timeout (%d)" , pSCom->timeout);
+    return NULL;
+  }
+
   if(zmq_setsockopt(subscriber, ZMQ_SUBSCRIBE, "", 0))
   {
     DiagMsg(DIAG_ERROR, "Receiver socket failed setup subscribe.");
@@ -164,7 +179,11 @@ void *socket_com_reciv(void *arg)
       }
     }
     else
-      DiagMsg(DIAG_WARNING,"receive socket rec error (%d)", ret);
+    {
+      //Notify if error code is different than timout
+      if(errno != EAGAIN )
+        DiagMsg(DIAG_WARNING,"receive socket rec error (%d)", errno);
+    }
   }
 
   zmq_close (subscriber);

@@ -38,10 +38,12 @@ void ftdi_menu(void)
 	int int_choice = 0;
 	int err;
 	int tmp;
+	int32_t i;
 	uint32_t numDevs;
 	FT_DEVICE_LIST_INFO_NODE * devInfo = NULL;
 	CLEAR_SCREEN();
 	// FTDI Menu
+	memset(char_choice, 0, sizeof(char_choice));
 	do
 	{
 		// If connected, display the connected device info.
@@ -185,9 +187,13 @@ void ftdi_menu(void)
 			int_choice = 99;
 			break;
 		default:
-			printf(""
-				   "Bad choice. Hot glue!"
-				   "");
+			printf("Bad choice (%d) ", (int32_t)strlen(char_choice));
+			for(i = 0; i < strlen(char_choice) && i < sizeof(char_choice); i++)
+			{
+				printf("0x%X ", char_choice[i] & 0xff);
+				char_choice[i] = 0;
+			}
+			printf("\n");
 			break;
 		}
 	} while (int_choice != 99);

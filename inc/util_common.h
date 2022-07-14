@@ -13,6 +13,9 @@
 #else
 #ifdef _WIN32
 #ifdef __CYGWIN__
+//#define  CLEAR_SCREEN() system("clear")
+// lets not loose logging information for now don't clear
+#define  CLEAR_SCREEN()
 #define  CLEAR_SCREEN() system("clear")
 #else
 #define  CLEAR_SCREEN() system("cls")

@@ -5,6 +5,7 @@
 #include "protocol_common.h"
 #include "diagnostics_util.h"
 #include <stdbool.h>
+#include <unistd.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,20 +79,23 @@ void *kmc_rec_thread(void *arg)
     //Todo handle busy flag
     while(pCode)
     {
-      pOutMsg = pCode->outmsg;
       if(_CHARQ_SIZE(&pCode->pool) >= pCode->subscriber.send_size)
       {
+        pOutMsg = pCode->outmsg;
         sendData = (uint8_t*)(pCode->outBuffer + sizeof(Msg_Keys_t));
+        //TODO Copy Data from circular pool. comments:
+        //We are doing a bit to many copies here? ZMQ is also doing malloc.
+        //Since the pool i circular and need to keep track of head and tail, 
+        //copy over to send buffer before send.
         for(i = 0; i < pCode->subscriber.send_size; i++ )
         {
           _CHARQ_DEQUEUE(&(pCode->pool),sendData[i]);
         }
-        DiagMsg(DIAG_DEBUG, "KMC REC dequeue (msg 0x%X)",pCode->subscriber.rec_code);
+        DiagMsg(DIAG_DEBUG, "KMC REC dequeue (msg 0x%X, sendData %p)",pCode->subscriber.rec_code, sendData);
 
         if(pHandler->enableCallback)
         {
           ret = ((int32_t(*)(uint8_t*, uint32_t))pCode->callback)((uint8_t*)pOutMsg,pOutMsg->size);
-        
           if(ret)
             DiagMsg(DIAG_ERROR, "Failed to send kmc rec msg");
         }
@@ -235,9 +239,12 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
     if(_CHARQ_FULL(&pCode->pool))
     {
       if( (pFrame->Size + KMC_TX_FRAME_SIZE + 1 ) < lsize)
+      {
         *Buffer = &pBuffer[pFrame->Size + KMC_TX_FRAME_SIZE + 1];
+        *size = (lsize - (pFrame->Size + KMC_TX_FRAME_SIZE + 1));
+      }
       else
-        *Buffer = NULL;
+        *size = 0;
       DiagMsg(DIAG_WARNING, "KMC rec full (code %d)", pCode->subscriber.rec_code);
       pthread_mutex_unlock(&(pHandle->lock));
       return PROTOCOL_STATUS_OK;
@@ -248,22 +255,24 @@ inline int32_t kmc_frame_parse(KMC_Rec_Handle_t * pHandle, uint8_t **Buffer, uin
       {
         _CHARQ_ENQUEUE(&pCode->pool, payload[i]);
       }
+      //DiagMsg(DIAG_DEBUG, "Enqued %p", pCode->pool.QUEUE);
       if(_CHARQ_SIZE(&pCode->pool) >= pCode->subscriber.send_size)
       {
         //signal_dequeue(pHandle);
         pthread_cond_signal( &(pHandle->dequeued) );
-      }
-        
+      }        
     }
     pthread_mutex_unlock(&(pHandle->lock));
 
     if( (pFrame->Size + KMC_TX_FRAME_SIZE + 1 ) < lsize)
+    {
       *Buffer = &pBuffer[pFrame->Size + KMC_TX_FRAME_SIZE + 1];
+      *size = (lsize - (pFrame->Size + KMC_TX_FRAME_SIZE + 1));
+    }
     else
-      *Buffer = NULL;
-      
-    *size -= pFrame->Size + KMC_TX_FRAME_SIZE + 1;
-    
+    {
+      *size = 0;
+    }
     return PROTOCOL_STATUS_OK;
   }
 }
@@ -382,7 +391,7 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     
     code->lastCnt = -1;
     
-    queue = (uint8_t*)malloc(msg->pool_size);   
+    queue = (uint8_t*)malloc(msg->pool_size + 100);   
     if(!queue)
     {
       DiagMsg(DIAG_ERROR, "Failed to cread kmc rec pool - Memory not available");
@@ -392,7 +401,7 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
     }
     _CHARQ_INIT(&code->pool, msg->pool_size, queue);
 
-    code->outBuffer = (uint8_t*)malloc(msg->send_size) + sizeof(Msg_Keys_t);
+    code->outBuffer = (uint8_t*)malloc(msg->send_size + sizeof(Msg_Keys_t) + 100);
     
     if(!code->outBuffer)
     {
@@ -417,7 +426,8 @@ uint32_t kmc_rec_subscribe( KMC_Rec_Handle_t * pHandle, void* pCallback, KMC_Rec
       pHandle->codes = code;
     
     pProt->Code[pProt->Size++] = msg->rec_code;
-    DiagMsg(DIAG_INFO, "KMC recorder started subscripiton on code 0x%X", msg->rec_code);
+    DiagMsg(DIAG_INFO, "KMC Rec Subscripiton (code 0x%X, pool size %d)",  msg->rec_code, msg->pool_size);
+    DiagMsg(DIAG_DEBUG, "(pool %p, outmsg %p code %p)", queue, code->outBuffer, code);
   }
   
   
@@ -453,6 +463,8 @@ void kmc_rec_unsubscribe(KMC_Rec_Handle_t * pHandle)
   {
     tmp = pCode;
     pCode = pCode->pNext;
+    DiagMsg(DIAG_INFO, "KMC Rec Unsubscripiton (code 0x%X)", tmp->subscriber.rec_code);
+    DiagMsg(DIAG_DEBUG, "pool %p, outmsg %p code %p)", tmp->pool.QUEUE, tmp->outBuffer, tmp);
     free(tmp->pool.QUEUE);
     free(tmp->outBuffer);
     free(tmp);

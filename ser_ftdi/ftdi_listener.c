@@ -83,9 +83,9 @@ void *threadlistener(void *arg)
 
   // timestamp_last = time(NULL);
   if (pDev)
-    DiagMsg(DIAG_DEBUG, "ftdi listener :: Start (id: %p, l:%d, dev:%d)\n", pFtdiListener->Stop, pDev->devid);
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: Start (id: %p, l:%d, dev:%d)", pFtdiListener->Stop, pDev->devid);
   else
-    DiagMsg(DIAG_DEBUG, "ftdi listener :: Start (id: %p, l:%d)\n", pFtdiListener->threadId, pFtdiListener->Stop);
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: Start (id: %p, l:%d)", pFtdiListener->threadId, pFtdiListener->Stop);
   EventDWord = FT_EVENT_RXCHAR | FT_EVENT_MODEM_STATUS;
 #ifdef _WIN32
   pFtdiListener->hEvent = CreateEvent(NULL,
@@ -164,9 +164,9 @@ void *threadlistener(void *arg)
       pthread_mutex_unlock(rLock);
   }
   if (pDev)
-    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d, dev:%d)\n", pFtdiListener->threadId, pFtdiListener->Stop, pDev->devid);
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d, dev:%d)", pFtdiListener->threadId, pFtdiListener->Stop, pDev->devid);
   else
-    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d)\n", pFtdiListener->threadId, pFtdiListener->Stop);
+    DiagMsg(DIAG_DEBUG, "ftdi listener :: End (id: %p, l:%d)", pFtdiListener->threadId, pFtdiListener->Stop);
 
   pFtdiListener->Running = false;
   return NULL;
