@@ -135,7 +135,7 @@ void close_sockets(void)
 
 void *socket_com_reciv(void *arg)
 {
-  uint8_t message[100];
+  uint8_t message[0x1000];
   Socket_Com_t * pSCom = (Socket_Com_t *)arg;
   Topic_Type_t * topic;
   int32_t ret;
