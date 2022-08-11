@@ -60,7 +60,7 @@ __weak int32_t handleAscii(uint8_t *buffer, uint32_t *size)
 
 int32_t receive_data(void *pHandler, uint8_t **buffer, uint32_t size)
 {
-  int32_t ret;
+  int32_t ret = PROTOCOL_STATUS_OK;
   uint32_t i;
   PROTOCOL_CALLBACK callback;
   Protocol_Handler_t *plHandler = (Protocol_Handler_t *)pHandler;

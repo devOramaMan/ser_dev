@@ -111,7 +111,7 @@ class ReceiveWorker(SocketWorker):
             #for topic in self.topics:
             #    socket.setsockopt(zmq.SUBSCRIBE, topic)
             socket.setsockopt(zmq.SUBSCRIBE, b'')
-            log.debug("subscribe all")
+            #log.debug("subscribe all")
         except:
             log.error("failed to add subscription")
             return

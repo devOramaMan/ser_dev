@@ -82,6 +82,8 @@ class DeviceInterface(QObject):
     updateLogVar = Signal()
     updateSampleView = Signal(list)
     connectionClosed = Signal()
+    openSignal = Signal()
+    preCloseSignal = Signal()
 
     Types = ['name','type', 'Id', 'host', 'port','baud']
     TypesExt = ['parity', 'stopbits','bytesize', 'timeout','endian']
@@ -99,23 +101,29 @@ class DeviceInterface(QObject):
         self.logvarlist = []
         self.IfLock = False
         self.sampleCollection = SampleDataCollection()
-        for stype in self.Types:
-            if stype in config:
-                if stype in self.ArgsMapping:
-                    if( stype in self.ArgsIntMap ):
-                        self.kwargs.update({self.ArgsMapping[stype]: int(config[stype])})
+        if config is not None:
+            for stype in self.Types:
+                if stype in config:
+                    if stype in self.ArgsMapping:
+                        if( stype in self.ArgsIntMap ):
+                            self.kwargs.update({self.ArgsMapping[stype]: int(config[stype])})
+                        else:
+                            self.kwargs.update({self.ArgsMapping[stype]: config[stype]})
                     else:
-                        self.kwargs.update({self.ArgsMapping[stype]: config[stype]})
-                else:
-                    if( stype in self.ArgsIntMap ):
-                        self.kwargs.update({stype: int(config[stype])})
-                    else:
-                        self.kwargs.update({stype: config[stype]})
-                #setattr(self, stype, constr[stype])
-            #else:
-                #var = None
-                #setattr(self, stype, var)
-        self.kwargs.update(constr)
+                        if( stype in self.ArgsIntMap ):
+                            self.kwargs.update({stype: int(config[stype])})
+                        else:
+                            self.kwargs.update({stype: config[stype]})
+                    #setattr(self, stype, constr[stype])
+                #else:
+                    #var = None
+                    #setattr(self, stype, var)
+        else:
+            self.kwargs = kwargs
+
+        if constr is not None:
+            self.kwargs.update(constr)
+
         self.kwargs.update({"LogVarFile":None})
         self.constr = constr
         self.changed = False
@@ -203,7 +211,8 @@ class DeviceInterface(QObject):
             try:
                 self.instance.Connect()
                 if self.instance.isConnect() is True:
-                    log.info("Connected to " + self.devname)    
+                    log.info("Connected to " + self.devname)
+                    self.openSignal.emit()
                 else:
                     log.warning("Unable to verify connection status (" + self.devname + ")")
                 self.closed = False
@@ -223,6 +232,8 @@ class DeviceInterface(QObject):
         if self.instance is None:
             return
         try:
+            if self.isConnect():
+                self.preCloseSignal.emit()
             self.instance.Close()
             log.info(self.devname + " closed")
             self.connectionClosed.emit()

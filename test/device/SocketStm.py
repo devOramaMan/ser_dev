@@ -36,6 +36,7 @@ class SubTransObj(TransAction):
         self.data = bytes()
         self.fmt = endian+structure
         self.size = size
+        log.debug("Subscription format fmt: %s size: %d" % (self.fmt,self.size))
         self.done = done
         self.callback = callback
         if hasattr(callback, '__iter__'):
@@ -167,6 +168,7 @@ class SocketStm(SocketInterface, RegisterInterface):
         self.subList = dict()
         self.subKeyCnt = 0
         self.decimate = 1
+        self.readSize = 0
 
     ##
     # @brief write register value
@@ -259,42 +261,77 @@ class SocketStm(SocketInterface, RegisterInterface):
         if self.isConnect() is False:
             return
         try:
-            frameid , reg = self.getReadMapping(startReg)
-            data = bytearray([SOCKET_SINGLE_TOPIC, SOCKET_SINGLE_FRAME_SIZE, nodeId, frameid, reg, 0,0,0,0])
-            key = self.getTransactionKey()
-            data[5:] = key.to_bytes(4,self.lendian)
-            callback = SingleTransObj(key,dataType,countReg)
-            self.sendData(callback, data, key)
-            data, err_code = callback.getData()
-            if err_code:
-                if err_code in STM.ERROR_CODE:
-                    log.error("Received nack: %s" % STM.ERROR_CODE[err_code][1])
-                else:
-                    log.error("Received nack %d" % self.err_code)
+            #todo Read intern from device
+            frameid , reg , intern = self.getReadMapping(startReg)
+            if intern:
+                return frameid
             else:
-                return data
+                data = bytearray([SOCKET_SINGLE_TOPIC, SOCKET_SINGLE_FRAME_SIZE, nodeId, frameid, reg, 0,0,0,0])
+                key = self.getTransactionKey()
+                data[5:] = key.to_bytes(4,self.lendian)
+                callback = SingleTransObj(key,dataType,countReg)
+                self.sendData(callback, data, key)
+                data, err_code = callback.getData()
+                if err_code:
+                    if err_code in STM.ERROR_CODE:
+                        log.error("Received nack: %s" % STM.ERROR_CODE[err_code][1])
+                    else:
+                        log.error("Received nack (code %d,  startReg %d frame %d, reg %d, cnt %d) " % (err_code, startReg, frameid, reg, countReg) )
+                else:
+                    return data
         except Exception as err:
-            log.error(err)
+            log.error("readRegister (err: %s, startReg %d, cnt %d) )" % (err, startReg, countReg) )
         return None
 
     ##
     # @brief private Get target mapping
     #
     def getReadMapping(self, address):
+        Internal = False
         if(address < STM.SER_STM_INTERNAL_ADR):
             frameid = STM.FRAME_ID['GET_REG']
             reg = address
+        elif((address >= STM.SER_STM_LOGVAR_ADR) and (address < (STM.SER_STM_LOGVAR_ADR + 1000))):
+            frameid, reg, Internal = self.ReadLogVar(address - STM.SER_STM_LOGVAR_ADR)
         elif((address >= STM.SER_STM_HW_PARAM_ADR) and (address < (STM.SER_STM_HW_PARAM_ADR + 200))):
             frameid = STM.FRAME_ID['KE_GET_HW_CONFIG']
             reg = address - STM.SER_STM_HW_PARAM_ADR
         elif((address >= STM.SER_STM_FW_PARAM_ADR) and (address < (STM.SER_STM_FW_PARAM_ADR + 1000))):
             frameid = STM.FRAME_ID['KE_GET_FW_CONFIG']
-            reg = address - STM.SER_STM_HW_PARAM_ADR
+            reg = address - STM.SER_STM_FW_PARAM_ADR
         else:
             log.error("Unknown mapping")
-            return None, None
-        return frameid, reg
+            return None, None, Internal
+        return frameid, reg, Internal
 
+    def ReadLogVar(self, ladr, count=1):
+        Internal=True
+        val = []
+        cnt = 0
+        lcnt=0
+        reg=0
+        #todo Read intern from device
+        while cnt < count and len(val) < count:
+            if (ladr == STM.SER_STM_LOGVAR_FILE): # get log var file
+                val.append(0)
+            elif(ladr == STM.SER_STM_LOGVAR_DECI):
+                val.append(self.decimate)
+            elif(ladr == STM.SER_STM_LOGVAR_TYPE):
+                val.append(self.LogType)
+            elif(ladr == STM.SER_STM_LOGVAR_SET):
+                if lcnt < len(self.logvarlist):
+                    val.append(self.logvarlist[lcnt])
+                else:
+                    val.append(0)   
+                lcnt +=1
+            elif(ladr == STM.SER_STM_LOGVAR_STATUS):
+                reg = 0
+                val = STM.FRAME_ID['KE_GET_LOG_STATUS'] 
+                Internal=False
+            else:
+                val.append(0)
+            cnt +=1
+        return val, reg, Internal
     ##
     # @brief write file
     #
@@ -334,6 +371,7 @@ class SocketStm(SocketInterface, RegisterInterface):
         data = b''
         try:
             #code, nodeid, filenum, type
+            self.readSize = 0 
             data = bytearray([SOCKET_READ_FILE_TOPIC, nodeId, filenum, self.readType])
             data.extend(self.chunkSize.to_bytes(4,self.lendian))
             data.extend(self.latency.to_bytes(4,self.lendian))
@@ -342,6 +380,7 @@ class SocketStm(SocketInterface, RegisterInterface):
             callback = SingleTransObj(key,None,0)
             self.sendData(callback, data, key)
             data, err_code = callback.getRaw()
+            self.readSize = len(data)
             if err_code:
                 if err_code in STM.ERROR_CODE:
                     log.error("Read File Nack: %s" % STM.ERROR_CODE[err_code][1])
@@ -435,7 +474,7 @@ class SocketStm(SocketInterface, RegisterInterface):
     def unSubscribe(self, id):
 
         if id in self.subList:
-            self.subList[id].setDone(True)
+            self.subList[id].setDone()
             #TODO Should be safe to delete here since the obj
             # is also in the transaction worker queue list 
             del self.subList[id]
@@ -472,7 +511,7 @@ class SocketStm(SocketInterface, RegisterInterface):
     # @brief read Progress
     #
     def getProgress(self):
-        return 0
+        return self.readSize
 
 
 
@@ -522,6 +561,7 @@ if __name__ == "__main__":
             print("12 - Read logging variable file")
             print("13 - Read log file")
             print("14 - Get interface statistics")
+            print("15 - Write file")
             print("q  - exit")
         else:
             print("1 - Connect")
@@ -539,15 +579,13 @@ if __name__ == "__main__":
             else:
                 socket_serial.Close()
 
-
-
         elif x == '2':
-            stub1 = testStub(size=22)
+            stub1 = testStub(size=18)
             json_string = \
                 u'{ "code": 150, \
                     "address":"0xAA",\
                     "send_size": 400, \
-                    "pool_size": 120000, \
+                    "pool_size": 8000, \
                     "items" :[ \
                     {"name":"state_io","dataType":"UNSIGNED8"}, \
                     {"name":"deflection cmd","dataType":"UNSIGNED8"}, \
@@ -564,10 +602,10 @@ if __name__ == "__main__":
             socket_serial.subscribe(**cnf)
 
             #enable maintenance transmitter
-            socket_serial.writeRegisterIf(2,173, ctypes.c_uint16, 3)
+            socket_serial.writeRegisterIf(2,173, ctypes.c_uint16, 3)    
             
         elif x == '3':
-            stub2 = testStub(size=7)
+            stub2 = testStub(size=7)    
             json_string = \
                 u'{ "code": 150, \
                     "address":"0xBC",\
@@ -668,9 +706,14 @@ if __name__ == "__main__":
             log.debug("File request")
             val = socket_serial.readFileIf(2,1)
             log.debug("File received")
-
         elif x == '14':
             print(socket_serial.getStats())
+        elif x == '15':
+
+            file=b'\xff\xaa\xff\xaa\x00\x00\x00\x004\x16\x00 ENCODER_M1._Super.wMecAngle\x00\x00\x00\x00\x00\x00\x00\x00\x00Deg @crank\x00\x00 N\x00\x00 \x1a\xeb8\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xaa\xff\xaa\x0b\x00\x00\x00\xd4\x16\x00 ENCODER_M2._Super.wMecAngle\x00\x00\x00\x00\x00\x00\x00\x00\x00Deg @crank\x00\x00 N\x00\x00 \x1a\xeb8\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            log.debug("File write start (file 0)")
+            val = socket_serial.writeFileIf(2,0, file)
+            log.debug("File write done")
 
         if x == 'q':
             socket_serial.Close()

@@ -45,7 +45,7 @@ void print_help(void);
 #define SOCKET_SERVER_ARG 106
 #define SOCKET_CONNECT_STR_ARG 107
 
-static const char version[] = "0.1.0";
+static const char version[] = "0.1.1";
 
 
 const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},
@@ -69,9 +69,9 @@ void print_help(void)
     printf("-v [0-x] -verbose [0-x] debug print out level\n");
     printf("-ver print version\n");
     printf("-t / -term - run ftdi terminal\n");
-    printf("-c [sn/com] - connect to device");
-    printf("-b [x] - set baudrate");
-    printf("-s - start socket server");
+    printf("-c [sn/com] - connect to device\n");
+    printf("-b [x] - set baudrate\n");
+    printf("-s - start socket server\n");
     printf("-h -help print help\n\n");
 }
 
