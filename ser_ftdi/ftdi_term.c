@@ -26,6 +26,7 @@
 
 
 void set_loglevel(void);
+void set_latency(void);
 void quick_connect(int local_baud_rate);
 bool get_term_baud_rate(int * local_baud_rate);
 FT_DEVICE_LIST_INFO_NODE * list_device(uint32_t *numDevs);
@@ -37,7 +38,8 @@ void ftdi_menu(void)
 	char char_choice[50];
 	int int_choice = 0;
 	int err;
-	int tmp;
+	FT_STATUS ftStatus;
+	uint8_t tmp = 0;
 	int32_t i;
 	uint32_t numDevs;
 	FT_DEVICE_LIST_INFO_NODE * devInfo = NULL;
@@ -52,7 +54,6 @@ void ftdi_menu(void)
 			devInfo = pCurrentDev->pDevInfo;
 			printf("\n");
 			printf("Connected Device: %d:\n", pCurrentDev->devid);
-			FT_GetLatencyTimer(pCurrentDev->ftHandle, (PUCHAR)&tmp);
 			if(devInfo)
 			{
 				printf(" 	Flags:         0x%02X\n", devInfo->Flags);
@@ -62,7 +63,24 @@ void ftdi_menu(void)
 				printf(" 	Serial Number: %s\n", devInfo->SerialNumber);
 				printf(" 	Description:   %s\n", devInfo->Description);
 				printf(" 	ftHandle =     %p\n", devInfo->ftHandle);
-				printf(" 	latency  =     %d\n", tmp);
+				ftStatus = FT_GetLatencyTimer(pCurrentDev->ftHandle, (PUCHAR)&tmp);
+				if (ftStatus == FT_OK) 
+				{
+					printf(" 	Latency  =     %d\n", tmp);
+				}
+				else
+				{
+					printf(" 	Failed to get Latency\n");
+				}
+				ftStatus = FT_GetBitMode(pCurrentDev->ftHandle, (PUCHAR)&tmp);
+				if (ftStatus == FT_OK) 
+				{
+					printf(" 	BitMode  =     %d\n", tmp);
+				}
+				else
+				{
+					printf(" 	Failed to get BitMode\n");
+				}
 			}
 		}
 
@@ -75,13 +93,16 @@ void ftdi_menu(void)
 		{
 			printf("       Not Connected:               \n\n");
 		}
-		printf("1. Quick Connect (device 0)\n");
+		if (!isRunning(&ftdi_listener)) // Only display option if devices list.
+		{
+			printf("1. Quick Connect (device 0)\n");
+		}
 		printf("2. Device List\n");
 		if (!isRunning(&ftdi_listener)) // Only display option if devices list.
 		{
 			printf("3. Connect Device\n");
 		}
-		if (pCurrentDev && !isRunning(&ftdi_listener)) // Only give display if connected.
+		if (pCurrentDev || isRunning(&ftdi_listener)) // Only give display if connected.
 		{
 			printf("4. Close Device\n");
 		}
@@ -103,6 +124,7 @@ void ftdi_menu(void)
 		if (pCurrentDev)// && (isRunning()))
 		{
 			printf("10. FCP Menu.\n");
+			printf("11. Set Latency\n");
 		}		
 
 		printf("99 Exit\n");
@@ -124,10 +146,7 @@ void ftdi_menu(void)
 			connect_device(&baud_rate);
 			break;
 		case 4:
-			if (pCurrentDev) // Only give display if connected.
-			{
-				close_device();
-			}
+			close_device();
 			break;
 		case 5:
 			if(get_term_baud_rate(&baud_rate))
@@ -174,7 +193,11 @@ void ftdi_menu(void)
 			set_loglevel();
 			break;
 		case 10:
-			fcp_menu();
+			if(pCurrentDev)
+				fcp_menu();
+			break;
+		case 11:
+			set_latency();
 			break;
 		case 99:
 			// main_menu();
@@ -239,6 +262,35 @@ void set_loglevel(void)
 
 		// Convert string to int for switch statement.
 	diag_set_verbose(atoi(char_choice));
+}
+
+void set_latency(void)
+{
+	if(!pCurrentDev)
+		return;
+	FT_STATUS ftStatus;
+	int32_t latency;
+	char char_choice[50];
+	printf("\n\nSet latency 2-x:");
+	scanf("%s", char_choice);
+
+	if(!pCurrentDev)
+	{
+		printf("connection closed\n");
+		return;
+	}
+
+	latency = atoi(char_choice);
+	if( latency > 1 && latency < 255)
+	{
+		ftStatus = FT_SetLatencyTimer(pCurrentDev->ftHandle, (UCHAR)latency);
+		if(ftStatus != FT_OK)
+			printf("Failed to set Latency (err:%d)\n", ftStatus);
+	}
+	else
+	{
+		printf("Illegal latency: %d (2-254)\n", latency);
+	}
 }
 
 void quick_connect(int local_baud_rate)

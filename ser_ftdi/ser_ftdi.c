@@ -45,7 +45,7 @@ void print_help(void);
 #define SOCKET_SERVER_ARG 106
 #define SOCKET_CONNECT_STR_ARG 107
 
-static const char version[] = "0.1.1";
+static const char version[] = "0.1.2";
 
 
 const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},
@@ -66,7 +66,7 @@ void print_help(void)
     printf("\n");
     printf("ser_ftdi.exe - serial ftdi interface (version: %s)\n", version);
     printf("\n");
-    printf("-v [0-x] -verbose [0-x] debug print out level\n");
+    printf("-v [0-x] -verbose [0-x] debug print out level (bit interpret)\n");
     printf("-ver print version\n");
     printf("-t / -term - run ftdi terminal\n");
     printf("-c [sn/com] - connect to device\n");

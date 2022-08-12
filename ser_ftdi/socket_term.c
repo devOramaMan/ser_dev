@@ -312,7 +312,8 @@ void *socket_menu(void *arg)
       else if(!strncasecmp(buffer, "diag", 4))
       {
         DiagMsg(DIAG_INFO, "diagnostic request");
-        size = protocol_diagnostics_dump(buffer, sizeof(buffer));      
+        size = protocol_diagnostics_dump(buffer, sizeof(buffer));
+        size += ftdi_config_dump(&buffer[size], sizeof(buffer)-size);
       }
       else
       {
@@ -334,4 +335,7 @@ void *socket_menu(void *arg)
   DiagMsg(DIAG_INFO, "Socket Menu closed. ");
   return NULL;
 }
+
+
+
 

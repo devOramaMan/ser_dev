@@ -19,5 +19,6 @@ bool get_device_sn(const char * sn, int * device);
 bool get_device_port(uint32_t port, int * device);
 int reset_device(int baud_rate);
 int set_baud_rate(int baud_rate);
+uint32_t ftdi_config_dump(char * buffer, uint32_t size);
 
 #endif /* ftdi_connect.h */

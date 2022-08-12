@@ -27,7 +27,7 @@ void printDiag(DiagnosticType type, const char * str, ...);
 /* Local var --------------------------------------------------------------*/
 volatile FS_CALLBACK pFSCallback = printDiag;
 volatile uint32_t lastClock = 0;
-volatile uint32_t verbose = (uint32_t) DIAG_ERROR;
+volatile uint32_t verbose = (uint32_t) (DIAG_ERROR | DIAG_ASCII);
 
 void diag_set_verbose(uint32_t val)
 {
@@ -60,8 +60,34 @@ uint16_t addLocalTime(char* print)
 
 uint16_t addDiagnosticType(char* print, DiagnosticType type)
 {
-	static const char DiagnosticTypeStr[][8] = {"ERROR: ", "WARN:  ",  "INFO:  ", "DEBUG: ", "RXMSG: ", "TXMSG: ", "UNKN:  "};
-  memcpy(print, DiagnosticTypeStr[type], 7);
+  switch(type)
+  {
+    case DIAG_ERROR:
+      memcpy(print, "ERROR: ", 7);
+    break;
+    case DIAG_WARNING:	
+      memcpy(print, "WARN:  ", 7);
+    break;
+    case DIAG_INFO:
+      memcpy(print, "INFO:  ", 7);
+    break;
+    case DIAG_DEBUG:
+      memcpy(print, "DEBUG: ", 7);
+    break;
+    case DIAG_RXMSG:
+    memcpy(print, "RXMSG: ", 7);
+    break;
+    case DIAG_TXMSG:
+    memcpy(print, "TXMSG: ", 7);
+    break;
+    case DIAG_ASCII:
+    memcpy(print, "ASCII: ", 7);
+    break;
+    case DIAG_UNKNOWN:
+    memcpy(print, "UNKN:  ", 7);
+    break;
+  }
+  
   return 7;
 }
 
@@ -124,11 +150,9 @@ void printDiag(DiagnosticType type, const char * str, ...)
   uint16_t len = 0;
   uint16_t snlen;
 
-  if(type > verbose)
+  if(!(type & verbose))
     return;
 
-  if(type > DIAG_UNKNOWN)
-    ltype = DIAG_UNKNOWN;
 
   char print[MAX_PRINT_SIZE];
   for(i = 0; i < MAX_PRINT_SIZE; i++)

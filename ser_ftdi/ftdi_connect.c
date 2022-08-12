@@ -28,7 +28,7 @@ ftdi_config_t  CurrentDev =
 ftdi_config_t * pCurrentDev = NULL;
 FT_DEVICE_LIST_INFO_NODE * pdevInfo = NULL;
 
-int32_t getCurrentLatency(void);
+uint8_t getCurrentLatency(void);
 
 
 int strcicmp(char const *a, char const *b)
@@ -42,9 +42,9 @@ int strcicmp(char const *a, char const *b)
 	return -1;
 }
 
-int32_t getCurrentLatency(void)
+uint8_t getCurrentLatency(void)
 {
-	return CurrentDev.latency;
+	return (uint8_t)CurrentDev.latency;
 }
 
 void setCurrentDev(int32_t devid, int32_t baud, uint32_t port, FT_DEVICE_LIST_INFO_NODE * devInfo )
@@ -66,7 +66,7 @@ int connect(int dev , int baudrate)
 {
 	int32_t ret;
 	uint32_t lComPortNumber;
-	int32_t latency;
+	uint8_t latency;
 
     if(!pdevInfo)
 	{
@@ -220,4 +220,49 @@ int set_baud_rate(int baud_rate)
         pCurrentDev->baud = baud_rate;
     
     return ret;
+}
+
+uint32_t ftdi_config_dump(char * buffer, uint32_t size)
+{
+	FT_STATUS ftStatus;
+	uint32_t ret = 0;
+	uint8_t tmp;
+	uint32_t lsize = size, asize;
+	char * pBuffer = buffer;
+	if(!pCurrentDev)
+		return 0;
+
+	ftStatus = FT_GetLatencyTimer(pCurrentDev->ftHandle, (PUCHAR)&tmp);
+	if (ftStatus == FT_OK) 
+	{
+		asize = snprintf(pBuffer,lsize, "Latency  =     %d\n" , tmp);
+		lsize -= asize;
+		ret	+= asize;
+		pBuffer += asize;
+	}
+	else
+	{
+		asize = snprintf(pBuffer,lsize, "Failed to get Latency\n");
+		lsize -= asize;
+		ret	+= asize;
+		pBuffer += asize;
+	}
+
+	ftStatus = FT_GetBitMode(pCurrentDev->ftHandle, (PUCHAR)&tmp);
+	if (ftStatus == FT_OK) 
+	{
+		asize = snprintf(pBuffer, lsize,"BitMode  =     %d\n", tmp);
+		lsize -= asize;
+		ret	+= asize;
+		pBuffer += asize;
+	}
+	else
+	{
+		asize = snprintf(pBuffer, lsize,"Failed to get BitMode\n");
+		lsize -= asize;
+		ret	+= asize;
+		pBuffer += asize;
+	}
+
+	return ret;
 }

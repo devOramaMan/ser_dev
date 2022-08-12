@@ -44,7 +44,7 @@ __weak int32_t handleAscii(uint8_t *buffer, uint32_t *size)
   //TODO take sub array of array of ascii
   if (!checkAscii(buffer, *size))
   {
-    if (diag_get_verbose() >= DIAG_RXMSG)
+    if (diag_get_verbose() & DIAG_ASCII)
     {
       while (*size > 0)
       {

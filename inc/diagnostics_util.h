@@ -8,13 +8,14 @@
 
 typedef enum
 {
-	DIAG_ERROR,
-	DIAG_WARNING,	
-	DIAG_INFO,
-	DIAG_DEBUG,
-	DIAG_RXMSG,
-	DIAG_TXMSG,
-    DIAG_UNKNOWN
+	DIAG_ERROR = 0x01,
+	DIAG_WARNING = 0x02,	
+	DIAG_INFO = 0x04,
+	DIAG_DEBUG = 0x08,
+	DIAG_RXMSG = 0x10,
+	DIAG_TXMSG = 0x20,
+	DIAG_ASCII = 0x40,
+    DIAG_UNKNOWN = 0
 }DiagnosticType;
 
 typedef void(*FS_CALLBACK)(DiagnosticType type, const char* str, ...);
