@@ -39,23 +39,43 @@ bool hasCode(Protocol_t *prot, uint8_t code)
   return ret;
 }
 
-__weak int32_t handleAscii(uint8_t *buffer, uint32_t *size)
+//Remove ascii handling use Diagnostic protocoll. Not safe
+// __weak int32_t handleAscii(uint8_t *buffer, uint32_t *size)
+// {
+//   //TODO take sub array of array of ascii
+//   if (!checkAscii(buffer, *size))
+//   {
+//     if (diag_get_verbose() & DIAG_ASCII)
+//     {
+//       while (*size > 0)
+//       {
+//         putchar(*buffer++);
+//         *size -= 1;
+//       }
+//     }
+//   }
+//   else
+//     return 1;
+//   return 0;
+// }
+
+void list_codes(void *pHandler)
 {
-  //TODO take sub array of array of ascii
-  if (!checkAscii(buffer, *size))
+  Protocol_Handler_t *plHandler = (Protocol_Handler_t *)pHandler;
+  Protocol_t *prot = NULL;
+  uint32_t i, j; 
+  DiagMsg(DIAG_DEBUG, "Registered Codes:");
+  for (i = 0; i < plHandler->size; i++)
   {
-    if (diag_get_verbose() & DIAG_ASCII)
+    prot = plHandler->ProtocolList[i].pProtocol;
+    if(prot)
     {
-      while (*size > 0)
+      for (j = 0; j < prot->Size; j++)
       {
-        putchar(*buffer++);
-        *size -= 1;
+        DiagMsg(DIAG_DEBUG, "Code 0x%X", prot->Code[j]);
       }
     }
   }
-  else
-    return 1;
-  return 0;
 }
 
 int32_t receive_data(void *pHandler, uint8_t **buffer, uint32_t size)
@@ -70,6 +90,7 @@ int32_t receive_data(void *pHandler, uint8_t **buffer, uint32_t size)
   while (slen > 0)
   {
     callback = NULL;
+    DiagMsg(DIAG_RXMSG, "Code 0x%X", *pBuffer );
     for (i = 0; i < plHandler->size; i++)
     {
       if ( hasCode(plHandler->ProtocolList[i].pProtocol, *pBuffer) )
@@ -103,28 +124,22 @@ int32_t receive_data(void *pHandler, uint8_t **buffer, uint32_t size)
         }
         else
         {
-          if (handleAscii(pBuffer, &slen))
-          {
-            ret = PROTOCOL_STATUS_INVALID_CODE;
-            DiagMsg(DIAG_RXMSG, "Invalid msg");
-            if (ret == PROTOCOL_CODE_CRC_ERROR)
-              plHandler->Diag.CRC_ERROR++;
-            else if (ret == PROTOCOL_STATUS_INVALID_CODE)
-              plHandler->Diag.UNKNOWN_MSG++;
+          ret = PROTOCOL_STATUS_INVALID_CODE;
+          DiagMsg(DIAG_RXMSG, "Invalid msg");
+          if (ret == PROTOCOL_CODE_CRC_ERROR)
+            plHandler->Diag.CRC_ERROR++;
+          else if (ret == PROTOCOL_STATUS_INVALID_CODE)
+            plHandler->Diag.UNKNOWN_MSG++;
 
-            plHandler->Diag.RX_ERROR++;
-          }
+          plHandler->Diag.RX_ERROR++;
         }
       }
     }
     else
     {
-      if (handleAscii(pBuffer, &slen))
-      {
-        ret = PROTOCOL_STATUS_INVALID_CODE;
-        plHandler->Diag.UNKNOWN_MSG++;
-        plHandler->Diag.RX_ERROR++;
-      }
+      ret = PROTOCOL_STATUS_INVALID_CODE;
+      plHandler->Diag.UNKNOWN_MSG++;
+      plHandler->Diag.RX_ERROR++;
     }
 
     if (ret)

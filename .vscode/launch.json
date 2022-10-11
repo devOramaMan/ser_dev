@@ -13,8 +13,7 @@
                 "-s",
                 "-t",
                 "-v",
-                "4",
-                "-s"
+                "4"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

@@ -75,7 +75,8 @@
         "fcp_frame_protocol.h": "c",
         "protocol_diag.h": "c",
         "typeinfo": "c",
-        "atomic_queue.h": "c"
+        "atomic_queue.h": "c",
+        "diag_frame_protocol.h": "c"
     },
     "files.exclude": {
         "**/.o": true,

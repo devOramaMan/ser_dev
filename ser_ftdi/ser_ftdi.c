@@ -86,6 +86,7 @@ Topic_Type_t msg_types[TOPIC_SIZE] =
 };
 
 extern int testSocket(void);
+extern void list_codes(void *pHandler);
 
 int main(int argc, char *argv[])
 {
@@ -178,10 +179,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    testSocket();
+    //testSocket();
 
     if( socket_server )
     {
+        list_codes((void*)&protocol_handler);
         register_topics(msg_types, TOPIC_SIZE);
         init_socket_menu(connectstr);
     }
