@@ -45,7 +45,7 @@ void print_help(void);
 #define SOCKET_SERVER_ARG 106
 #define SOCKET_CONNECT_STR_ARG 107
 
-static const char version[] = "0.1.2";
+static const char version[] = "0.2.1";
 
 
 const struct option long_opts[] = {{"help", no_argument, NULL, HELP_ARG},

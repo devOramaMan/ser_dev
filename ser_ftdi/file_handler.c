@@ -180,9 +180,17 @@ void *file_thread(void *arg)
         else if( queue->File.code == WRITE_FILE_RECORD_TOPIC )
         {
           tmp = &fcp_msg.Buffer[2];
-          for(i = 2; (i < 128) && (filesize < queue->File.size); i++)
+          if( filesize < queue->File.size )
           {
-             _CHARQ_DEQUEUE( &pFHandler->fileWrite, *tmp++ );
+            for(i = 2; (i < 128) && (filesize < queue->File.size); i++)
+            {
+              _CHARQ_DEQUEUE( &pFHandler->fileWrite, *tmp++ );
+              filesize++;
+            }
+          }
+          else
+          {
+            i = 2;
             filesize++;
           }
           fcp_msg.Size = i;
@@ -221,7 +229,8 @@ void *file_thread(void *arg)
           }
           else if (queue->File.code == WRITE_FILE_RECORD_TOPIC)
           {
-            if( filesize >= queue->File.size )
+            DiagMsg(DIAG_DEBUG, "File Write - (%db)", filesize);
+            if( filesize > queue->File.size )
             {
               receiveCode = FCP_FILE_DONE;
             }
