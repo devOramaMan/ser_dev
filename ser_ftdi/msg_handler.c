@@ -33,9 +33,16 @@ uint32_t msg_fcp_single(void* pCallback, uint8_t *buffer)
   //Value address
   value = (&buffer[FCP_SINGLE_PAYLOAD] + 1);
   crc_idx = size + 1;
+  if( in_msg->frameid >= 0xE0 )
+  {
+    fcp_msg.Code = in_msg->frameid;
+  }
+  else
+  {
+    fcp_msg.Code = (in_msg->nodeid << 5);
+    fcp_msg.Code |= in_msg->frameid  & ~(0xE0);
+  }
 
-  fcp_msg.Code = (in_msg->nodeid << 5);
-  fcp_msg.Code |= in_msg->frameid  & ~(0xE0);
   fcp_msg.Buffer[0] = (uint8_t)in_msg->startReg;
   fcp_msg.Size = crc_idx;
   for (i = 0; i < size; i++)  
