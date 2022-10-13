@@ -197,6 +197,7 @@ void *file_thread(void *arg)
           outMsg.size = fcp_msg.Size + 3;
           *tmp = fcp_calc_crc(&fcp_msg);
         }
+        DiagMsg(DIAG_DEBUG, "File Write/ReadReq msg (size: %d, %d)", outMsg.size, fcp_msg.Size);
         append_send_msg(&outMsg);
 
         time_to_wait.tv_sec = time(NULL) + pFHandler->timeout;
@@ -230,7 +231,7 @@ void *file_thread(void *arg)
           else if (queue->File.code == WRITE_FILE_RECORD_TOPIC)
           {
             DiagMsg(DIAG_DEBUG, "File Write - (%db)", filesize);
-            if( filesize > queue->File.size )
+            if( (filesize >= queue->File.size) && (fcp_msg.Size < FCP_MAX_PAYLOAD_SIZE) )
             {
               receiveCode = FCP_FILE_DONE;
             }
